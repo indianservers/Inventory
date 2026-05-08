@@ -1,0 +1,5 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="panel"><div class="d-flex justify-content-between mb-3"><h2 class="h5 mb-0">Sales Returns</h2><a class="btn btn-primary" href="{{ url_for('sales.return_create') }}"><i class="bi bi-plus-lg"></i> Return</a></div>
+<table class="table datatable align-middle"><thead><tr><th>No</th><th>Date</th><th>Customer</th><th>Total</th><th>Mode</th></tr></thead><tbody>{% for r in items %}<tr><td>{{ r.return_no }}</td><td>{{ r.return_date }}</td><td>{{ r.sales_return_customer.name }}</td><td>{{ r.grand_total }}</td><td>{{ r.refund_mode }}</td></tr>{% endfor %}</tbody></table></div>
+{% endblock %}

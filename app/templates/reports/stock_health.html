@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="panel">
+  <button class="btn btn-outline-secondary mb-3" onclick="window.print()"><i class="bi bi-printer"></i> Print</button>
+  <table class="table datatable align-middle">
+    <thead><tr><th>SKU</th><th>Product</th><th>Warehouse</th><th>Rack/Bin</th><th>Current</th><th>Minimum</th><th>Reorder</th><th>Suggested Qty</th></tr></thead>
+    <tbody>{% for p in products %}<tr>
+      <td>{{ p.sku }}</td>
+      <td>{{ p.name }}</td>
+      <td>{{ p.warehouse.name if p.warehouse }}</td>
+      <td>{{ p.rack_bin or '' }}</td>
+      <td>{{ p.current_stock }}</td>
+      <td>{{ p.min_stock }}</td>
+      <td>{{ p.reorder_level }}</td>
+      <td>{{ (p.max_stock or p.reorder_level or p.min_stock or 0) - (p.current_stock or 0) }}</td>
+    </tr>{% endfor %}</tbody>
+  </table>
+</div>
+{% endblock %}

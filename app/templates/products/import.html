@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block content %}
+<form class="panel" method="post" enctype="multipart/form-data">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <div class="mb-3">
+    <label class="form-label">CSV or Excel file</label>
+    <input class="form-control" type="file" name="file" accept=".csv,.xlsx" required>
+  </div>
+  <div class="alert alert-info">Required columns: sku, name. Optional columns: barcode, description, hsn_code, purchase_price, sales_price, mrp, current_stock, average_cost, opening_stock, min_stock, max_stock, reorder_level, rack_bin, is_active.</div>
+  <div class="d-flex gap-2">
+    <button class="btn btn-primary"><i class="bi bi-upload"></i> Import</button>
+    <a class="btn btn-outline-secondary" href="{{ url_for('products.index') }}">Cancel</a>
+  </div>
+</form>
+{% endblock %}

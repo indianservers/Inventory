@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block content %}
+<form class="panel" method="post"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><div class="form-grid">
+{% for name,label,req in [('customer_code','Customer Code',1),('name','Customer Name',1),('business_name','Business Name',0),('email','Email',0),('phone','Phone',0),('alt_phone','Alternate Phone',0),('city','City',0),('state','State',0),('country','Country',0),('postal_code','Postal Code',0),('gst_number','GST/VAT/TRN',0),('pan_number','PAN/Tax ID',0),('credit_limit','Credit Limit',0),('opening_balance','Opening Balance',0),('payment_terms','Payment Terms',0)] %}
+<div><label class="form-label">{{ label }}</label><input class="form-control" name="{{ name }}" value="{{ item|attr(name) or '' }}" {% if req %}required{% endif %}></div>
+{% endfor %}
+<div class="full"><label class="form-label">Billing Address</label><textarea class="form-control" name="billing_address">{{ item.billing_address or '' }}</textarea></div>
+<div class="full"><label class="form-label">Shipping Address</label><textarea class="form-control" name="shipping_address">{{ item.shipping_address or '' }}</textarea></div>
+<label class="form-check full"><input class="form-check-input" name="status" type="checkbox" {% if item.status %}checked{% endif %}> Active</label></div>
+<div class="mt-3"><button class="btn btn-primary">Save</button></div></form>
+{% endblock %}
+

@@ -1,0 +1,2 @@
+{% extends "base.html" %}{% block content %}<div class="panel"><button class="btn btn-outline-secondary mb-3" onclick="window.print()"><i class="bi bi-printer"></i> Print</button><table class="table datatable"><thead><tr>{% for c in columns %}<th>{{ c|replace('_',' ')|title }}</th>{% endfor %}</tr></thead><tbody>{% for r in rows %}<tr>{% for c in columns %}<td>{{ r|attr(c) }}</td>{% endfor %}</tr>{% endfor %}</tbody></table></div>{% endblock %}
+

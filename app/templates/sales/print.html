@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="panel print-template">
+  <div class="d-flex justify-content-between">
+    <div class="d-flex gap-3">
+      {% if company and company.logo %}<img src="{{ url_for('static', filename=company.logo) }}" alt="Logo" style="max-height:72px">{% endif %}
+      <div><h2>{{ company.company_name if company else 'Vyapara ERP' }}</h2><p>{{ company.address if company }}<br>GSTIN: {{ company.tax_number if company }}</p></div>
+    </div>
+    <div class="text-end"><h3>Tax Invoice</h3><p>{{ sale.invoice_no }}<br>{{ sale.invoice_date }}</p></div>
+  </div>
+  <p><strong>Customer:</strong> {{ sale.customer.name }}<br><strong>Address:</strong> {{ sale.customer.billing_address or '' }}</p>
+  <table class="table"><thead><tr><th>Item</th><th>HSN</th><th>Qty</th><th>Rate</th><th>Discount</th><th>Tax</th><th>Total</th></tr></thead><tbody>{% for i in sale.items %}<tr><td>{{ i.product.name }}</td><td>{{ i.product.hsn_code }}</td><td>{{ i.quantity }}</td><td>{{ i.rate }}</td><td>{{ i.discount_amount }}</td><td>{{ i.tax_amount }}</td><td>{{ i.line_total }}</td></tr>{% endfor %}</tbody></table>
+  <h4 class="h6 mt-4">HSN/SAC Summary</h4>
+  <table class="table table-sm"><thead><tr><th>HSN/SAC</th><th>Tax Rate</th><th>Taxable</th><th>Tax</th><th>Total</th></tr></thead><tbody>{% for row in hsn_rows %}<tr><td>{{ row.hsn }}</td><td>{{ row.rate }}%</td><td>{{ "%.2f"|format(row.taxable) }}</td><td>{{ "%.2f"|format(row.tax) }}</td><td>{{ "%.2f"|format(row.total) }}</td></tr>{% endfor %}</tbody></table>
+  <div class="text-end"><p>Subtotal: {{ sale.subtotal }}<br>Discount: {{ sale.discount_total }}<br>Tax: {{ sale.tax_total }}<br><strong>Grand Total: {{ sale.grand_total }}</strong></p></div>
+  <p>{{ sale.terms }}</p><div class="text-end mt-5">Authorized Signature</div>
+  <div class="d-flex flex-wrap gap-2 print-hide">
+    <button class="btn btn-outline-secondary" onclick="window.print()">Print</button>
+    <a class="btn btn-outline-primary" href="{{ url_for('sales.email_invoice', id=sale.id) }}"><i class="bi bi-envelope"></i> Email</a>
+    <a class="btn btn-outline-success" href="{{ url_for('sales.whatsapp_invoice', id=sale.id) }}"><i class="bi bi-whatsapp"></i> WhatsApp</a>
+    <a class="btn btn-outline-secondary" href="{{ url_for('sales.e_invoice_json', id=sale.id) }}"><i class="bi bi-braces"></i> E-Invoice JSON</a>
+    <a class="btn btn-outline-secondary" href="{{ url_for('sales.packing_slip', id=sale.id) }}"><i class="bi bi-box"></i> Packing Slip</a>
+    <a class="btn btn-outline-secondary" href="{{ url_for('sales.shipping_label', id=sale.id) }}"><i class="bi bi-truck"></i> Shipping Label</a>
+  </div>
+</div>
+{% endblock %}

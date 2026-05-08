@@ -1,0 +1,2 @@
+{% extends "base.html" %}{% block content %}<div class="panel"><table class="table datatable"><thead><tr><th>Date</th><th>Product</th><th>Movement</th><th>Reference</th><th>In</th><th>Out</th><th>Balance</th></tr></thead><tbody>{% for e in entries %}<tr><td>{{ e.date }}</td><td>{{ e.product.name }}</td><td>{{ e.movement_type }}</td><td>{{ e.reference_no }}</td><td>{{ e.qty_in }}</td><td>{{ e.qty_out }}</td><td>{{ e.balance_qty }}</td></tr>{% endfor %}</tbody></table></div>{% endblock %}
+

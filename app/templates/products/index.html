@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="panel">
+  <div class="d-flex flex-wrap justify-content-between gap-2 mb-3">
+    <h2 class="h5 mb-0">Product Master</h2>
+    <div class="d-flex flex-wrap gap-2">
+      <a class="btn btn-outline-secondary" href="{{ url_for('products.import_products') }}"><i class="bi bi-upload"></i> Import</a>
+      <a class="btn btn-outline-secondary" href="{{ url_for('products.export') }}"><i class="bi bi-filetype-csv"></i> CSV</a>
+      <a class="btn btn-outline-secondary" href="{{ url_for('products.export', format='xlsx') }}"><i class="bi bi-file-earmark-excel"></i> Excel</a>
+      <a class="btn btn-primary" href="{{ url_for('products.create') }}"><i class="bi bi-plus-lg"></i> Product</a>
+    </div>
+  </div>
+  <form class="row g-2 mb-3" method="get">
+    <div class="col-md-10"><input class="form-control" name="q" value="{{ search or '' }}" placeholder="Search SKU, barcode, name, HSN, rack/bin"></div>
+    <div class="col-md-2 d-grid"><button class="btn btn-outline-primary"><i class="bi bi-search"></i> Search</button></div>
+  </form>
+  <table class="table datatable align-middle">
+    <thead><tr><th>SKU</th><th>Barcode</th><th>Name</th><th>Rack/Bin</th><th>Category</th><th>Purchase</th><th>Sale</th><th>Stock</th><th>Status</th><th></th></tr></thead>
+    <tbody>{% for p in products %}<tr>
+      <td>{{ p.sku }}</td><td>{{ p.barcode or '' }}</td><td>{{ p.name }}</td><td>{{ p.rack_bin or '' }}</td><td>{{ p.category.name if p.category }}</td><td>{{ p.purchase_price }}</td><td>{{ p.sales_price }}</td><td><span class="badge text-bg-{{ 'warning' if p.is_low_stock else 'light' }}">{{ p.current_stock }}</span></td><td>{{ 'Active' if p.is_active else 'Inactive' }}</td>
+      <td class="table-actions"><a class="btn btn-sm btn-outline-secondary" href="{{ url_for('products.qr_label', id=p.id) }}"><i class="bi bi-qr-code"></i></a><a class="btn btn-sm btn-outline-primary" href="{{ url_for('products.edit', id=p.id) }}"><i class="bi bi-pencil"></i></a><a class="btn btn-sm btn-outline-danger" data-confirm="Mark product inactive?" href="{{ url_for('products.delete', id=p.id) }}"><i class="bi bi-trash"></i></a></td>
+    </tr>{% endfor %}</tbody>
+  </table>
+</div>
+{% endblock %}

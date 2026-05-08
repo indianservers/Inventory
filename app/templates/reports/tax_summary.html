@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="panel">
+  <button class="btn btn-outline-secondary mb-3" onclick="window.print()"><i class="bi bi-printer"></i> Print</button>
+  <table class="table align-middle">
+    <tbody>
+      <tr><th>Output tax on sales</th><td class="text-end">{{ "%.2f"|format(sales_tax) }}</td></tr>
+      <tr><th>Input tax on purchases</th><td class="text-end">{{ "%.2f"|format(purchase_tax) }}</td></tr>
+      <tr><th>Input tax on expenses</th><td class="text-end">{{ "%.2f"|format(expense_tax) }}</td></tr>
+    </tbody>
+    <tfoot><tr><th>Net Tax Payable</th><th class="text-end">{{ "%.2f"|format(net_tax) }}</th></tr></tfoot>
+  </table>
+</div>
+{% endblock %}

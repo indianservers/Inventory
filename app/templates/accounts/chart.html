@@ -1,0 +1,2 @@
+{% extends "base.html" %}{% block content %}<div class="panel"><table class="table datatable"><thead><tr><th>Code</th><th>Name</th><th>Group</th><th>Balance</th></tr></thead><tbody>{% for a in accounts %}<tr><td>{{ a.account_code }}</td><td>{{ a.account_name }}</td><td>{{ a.group.name }}</td><td>{{ a.current_balance }}</td></tr>{% endfor %}</tbody></table></div>{% endblock %}
+

@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="panel">
+  <button class="btn btn-outline-secondary mb-3" onclick="window.print()"><i class="bi bi-printer"></i> Print</button>
+  <table class="table datatable align-middle">
+    <thead><tr><th>Product</th><th>Warehouse</th><th>Batch</th><th>Serial</th><th>Qty</th><th>Expiry</th><th>Status</th></tr></thead>
+    <tbody>{% for batch in batches %}<tr>
+      <td>{{ batch.product.sku }} - {{ batch.product.name }}</td>
+      <td>{{ batch.warehouse.name if batch.warehouse }}</td>
+      <td>{{ batch.batch_no }}</td>
+      <td>{{ batch.serial_no or '' }}</td>
+      <td>{{ batch.quantity }}</td>
+      <td>{{ batch.expiry_date }}</td>
+      <td><span class="badge text-bg-{{ 'danger' if batch.expiry_date < today else 'warning' }}">{{ 'Expired' if batch.expiry_date < today else 'Expiring Soon' }}</span></td>
+    </tr>{% endfor %}</tbody>
+  </table>
+</div>
+{% endblock %}

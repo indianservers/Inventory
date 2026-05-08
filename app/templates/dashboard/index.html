@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="row g-3 mb-3">
+  {% for label, value, icon, color in [
+    ('Sales Today', metrics.sales_today, 'receipt', 'primary'),
+    ('Purchases Today', metrics.purchases_today, 'cart-plus', 'success'),
+    ('Receivables', metrics.receivables, 'arrow-down-left-circle', 'warning'),
+    ('Payables', metrics.payables, 'arrow-up-right-circle', 'danger'),
+    ('Stock Value', metrics.stock_value, 'boxes', 'primary'),
+    ('Cash Balance', cash_balance, 'cash-stack', 'success')
+  ] %}
+  <div class="col-md-4 col-xl-2">
+    <div class="metric">
+      <i class="bi bi-{{ icon }} text-{{ color }}"></i>
+      <div class="text-muted mt-2">{{ label }}</div>
+      <div class="value">{{ "%.2f"|format(value|float) }}</div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+<div class="row g-3">
+  <div class="col-lg-8">
+    <div class="panel"><canvas id="monthlyChart" height="120"></canvas></div>
+  </div>
+  <div class="col-lg-4">
+    <div class="panel">
+      <h2 class="h6">Low Stock Items</h2>
+      <table class="table table-sm">
+        {% for p in metrics.low_stock %}<tr><td>{{ p.name }}</td><td class="text-end">{{ p.current_stock }}</td></tr>{% else %}<tr><td>No low stock alerts</td></tr>{% endfor %}
+      </table>
+    </div>
+  </div>
+  <div class="col-lg-6">
+    <div class="panel">
+      <h2 class="h6">Recent Invoices</h2>
+      <table class="table table-sm">{% for s in recent_invoices %}<tr><td>{{ s.invoice_no }}</td><td>{{ s.customer.name }}</td><td class="text-end">{{ s.grand_total }}</td></tr>{% else %}<tr><td>No invoices yet</td></tr>{% endfor %}</table>
+    </div>
+  </div>
+  <div class="col-lg-6">
+    <div class="panel">
+      <h2 class="h6">Recent Receipts</h2>
+      <table class="table table-sm">{% for p in recent_payments %}<tr><td>{{ p.receipt_no }}</td><td>{{ p.customer.name }}</td><td class="text-end">{{ p.amount }}</td></tr>{% else %}<tr><td>No receipts yet</td></tr>{% endfor %}</table>
+    </div>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+new Chart(document.getElementById('monthlyChart'), {
+  type: 'line',
+  data: {labels:['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'], datasets:[
+    {label:'Sales', data:{{ sales_monthly|tojson }}, borderColor:'#2563eb', tension:.35},
+    {label:'Purchases', data:{{ purchase_monthly|tojson }}, borderColor:'#16a34a', tension:.35}
+  ]}
+});
+</script>
+{% endblock %}
+

@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="panel">
+  <div class="d-flex justify-content-between mb-3">
+    <h2 class="h5 mb-0">Stock Transfers</h2>
+    <a class="btn btn-primary" href="{{ url_for('stock.transfer_create') }}"><i class="bi bi-arrow-left-right"></i> Transfer</a>
+  </div>
+  <table class="table datatable align-middle">
+    <thead><tr><th>No</th><th>Date</th><th>From</th><th>To</th><th>Status</th><th>Items</th></tr></thead>
+    <tbody>{% for transfer in transfers %}<tr>
+      <td>{{ transfer.transfer_no }}</td>
+      <td>{{ transfer.transfer_date }}</td>
+      <td>{{ transfer.from_warehouse.name }}</td>
+      <td>{{ transfer.to_warehouse.name }}</td>
+      <td><span class="badge text-bg-success">{{ transfer.status }}</span></td>
+      <td>{{ transfer.items.count() }}</td>
+    </tr>{% endfor %}</tbody>
+  </table>
+</div>
+{% endblock %}

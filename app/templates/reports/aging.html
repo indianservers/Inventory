@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="panel">
+  <button class="btn btn-outline-secondary mb-3" onclick="window.print()"><i class="bi bi-printer"></i> Print</button>
+  <table class="table datatable align-middle">
+    <thead><tr><th>{{ party_label }}</th><th>Reference</th><th>Due Date</th><th>Days</th><th>Current</th><th>1-30</th><th>31-60</th><th>61-90</th><th>90+</th><th>Total</th></tr></thead>
+    <tbody>{% for row in rows %}<tr>
+      <td>{{ row.party }}</td><td>{{ row.reference_no }}</td><td>{{ row.due_date }}</td><td>{{ row.days }}</td>
+      <td>{{ "%.2f"|format(row.current) }}</td><td>{{ "%.2f"|format(row.days_1_30) }}</td><td>{{ "%.2f"|format(row.days_31_60) }}</td><td>{{ "%.2f"|format(row.days_61_90) }}</td><td>{{ "%.2f"|format(row.over_90) }}</td><td>{{ "%.2f"|format(row.amount) }}</td>
+    </tr>{% endfor %}</tbody>
+  </table>
+</div>
+{% endblock %}

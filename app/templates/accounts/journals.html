@@ -1,0 +1,2 @@
+{% extends "base.html" %}{% block content %}<div class="panel"><div class="d-flex justify-content-between mb-3"><h2 class="h5">Journals</h2><a class="btn btn-primary" href="{{ url_for('accounts.journal_create') }}">Journal</a></div><table class="table datatable"><thead><tr><th>No</th><th>Date</th><th>Narration</th><th>Debit</th><th>Credit</th></tr></thead><tbody>{% for j in journals %}<tr><td>{{ j.entry_no }}</td><td>{{ j.entry_date }}</td><td>{{ j.narration }}</td><td>{{ j.total_debit }}</td><td>{{ j.total_credit }}</td></tr>{% endfor %}</tbody></table></div>{% endblock %}
+

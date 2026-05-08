@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="row g-3">
+  {% for section in sections %}
+  <div class="col-lg-4">
+    <div class="panel h-100">
+      <h2 class="h5">{{ section.type }}</h2>
+      <table class="table align-middle">
+        <thead><tr><th>Account</th><th class="text-end">Balance</th></tr></thead>
+        <tbody>{% for row in section.rows %}<tr><td>{{ row.code }} - {{ row.name }}<div class="text-muted small">{{ row.group }}</div></td><td class="text-end">{{ "%.2f"|format(row.balance) }}</td></tr>{% endfor %}</tbody>
+        <tfoot><tr><th>Total</th><th class="text-end">{{ "%.2f"|format(section.total) }}</th></tr></tfoot>
+      </table>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}

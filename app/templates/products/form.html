@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block content %}
+<form class="panel" method="post" enctype="multipart/form-data">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <div class="form-grid">
+    {% for name,label,typ,req in [
+      ('sku','SKU','text',1),('barcode','Barcode','text',0),('name','Product Name','text',1),('hsn_code','HSN/SAC','text',0),
+      ('purchase_price','Purchase Price','number',0),('sales_price','Sales Price','number',0),('mrp','MRP','number',0),('opening_stock','Opening Stock','number',0),
+      ('min_stock','Minimum Stock','number',0),('max_stock','Maximum Stock','number',0),('reorder_level','Reorder Level','number',0),('rack_bin','Rack/Bin','text',0)
+    ] %}
+    <div><label class="form-label">{{ label }}</label><input class="form-control" name="{{ name }}" type="{{ typ }}" step="0.001" value="{{ product|attr(name) or '' }}" {% if req %}required{% endif %}></div>
+    {% endfor %}
+    <div><label class="form-label">Category</label><select class="form-select" name="category_id"><option value="">None</option>{% for x in categories %}<option value="{{ x.id }}" {% if product.category_id==x.id %}selected{% endif %}>{{ x.name }}</option>{% endfor %}</select></div>
+    <div><label class="form-label">Brand</label><select class="form-select" name="brand_id"><option value="">None</option>{% for x in brands %}<option value="{{ x.id }}" {% if product.brand_id==x.id %}selected{% endif %}>{{ x.name }}</option>{% endfor %}</select></div>
+    <div><label class="form-label">Unit</label><select class="form-select" name="unit_id"><option value="">None</option>{% for x in units %}<option value="{{ x.id }}" {% if product.unit_id==x.id %}selected{% endif %}>{{ x.name }}</option>{% endfor %}</select></div>
+    <div><label class="form-label">Tax</label><select class="form-select" name="tax_id"><option value="">None</option>{% for x in taxes %}<option value="{{ x.id }}" {% if product.tax_id==x.id %}selected{% endif %}>{{ x.name }} {{ x.rate }}%</option>{% endfor %}</select></div>
+    <div><label class="form-label">Warehouse</label><select class="form-select" name="warehouse_id"><option value="">None</option>{% for x in warehouses %}<option value="{{ x.id }}" {% if product.warehouse_id==x.id %}selected{% endif %}>{{ x.name }}</option>{% endfor %}</select></div>
+    <div class="full"><label class="form-label">Description</label><textarea class="form-control" name="description">{{ product.description or '' }}</textarea></div>
+    <div class="full"><label class="form-label">Product Photos</label><input class="form-control" type="file" name="images" accept="image/*" multiple></div>
+    <div class="full d-flex flex-wrap gap-3">
+      {% for name,label in [('batch_tracking','Batch tracking'),('serial_tracking','Serial tracking'),('expiry_tracking','Expiry tracking'),('is_active','Active')] %}
+      <label class="form-check"><input class="form-check-input" type="checkbox" name="{{ name }}" {% if product|attr(name) or name=='is_active' and not product.id %}checked{% endif %}> {{ label }}</label>
+      {% endfor %}
+    </div>
+  </div>
+  {% if product.id and product.images.count() %}
+  <hr>
+  <div class="row g-3">
+    {% for image in product.images.all() %}
+    <div class="col-sm-6 col-md-3">
+      <div class="product-photo">
+        <img src="{{ url_for('static', filename=image.image_path) }}" alt="{{ product.name }}">
+        <div class="d-flex justify-content-between align-items-center mt-2">
+          <span class="badge text-bg-{{ 'primary' if image.is_primary else 'light' }}">{{ 'Primary' if image.is_primary else 'Photo' }}</span>
+          <div class="d-flex gap-1">
+            {% if not image.is_primary %}<a class="btn btn-sm btn-outline-primary" href="{{ url_for('products.set_primary_image', id=image.id) }}"><i class="bi bi-star"></i></a>{% endif %}
+            <a class="btn btn-sm btn-outline-danger" data-confirm="Delete this image?" href="{{ url_for('products.delete_image', id=image.id) }}"><i class="bi bi-trash"></i></a>
+          </div>
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+  <div class="mt-3 d-flex gap-2"><button class="btn btn-primary">Save</button><a class="btn btn-outline-secondary" href="{{ url_for('products.index') }}">Cancel</a></div>
+</form>
+{% endblock %}

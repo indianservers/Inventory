@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="panel">
+  <form class="row g-2 mb-3" method="get">
+    <div class="col-md-10"><input class="form-control" name="q" value="{{ q }}" placeholder="Search products, customers, suppliers, invoices, purchases" autofocus></div>
+    <div class="col-md-2 d-grid"><button class="btn btn-primary"><i class="bi bi-search"></i> Search</button></div>
+  </form>
+  <table class="table align-middle">
+    <thead><tr><th>Type</th><th>Result</th><th>Detail</th><th></th></tr></thead>
+    <tbody>{% for result in results %}<tr>
+      <td><span class="badge text-bg-light">{{ result.type }}</span></td>
+      <td>{{ result.label }}</td>
+      <td>{{ result.detail }}</td>
+      <td class="text-end"><a class="btn btn-sm btn-outline-primary" href="{{ result.url }}"><i class="bi bi-box-arrow-up-right"></i></a></td>
+    </tr>{% endfor %}</tbody>
+  </table>
+</div>
+{% endblock %}

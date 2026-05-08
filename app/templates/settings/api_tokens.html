@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block content %}
+{% if plain_token %}
+<div class="alert alert-warning"><strong>New token:</strong> <code>{{ plain_token }}</code></div>
+{% endif %}
+<form class="panel mb-3" method="post">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <div class="form-grid">
+    <div><label class="form-label">Token Name</label><input class="form-control" name="name" required></div>
+    <div><label class="form-label">User</label><select class="form-select" name="user_id"><option value="">System</option>{% for user in users %}<option value="{{ user.id }}">{{ user.name }}</option>{% endfor %}</select></div>
+  </div>
+  <button class="btn btn-primary mt-3"><i class="bi bi-key"></i> Create Token</button>
+</form>
+<div class="panel">
+  <table class="table datatable align-middle">
+    <thead><tr><th>Name</th><th>Prefix</th><th>User</th><th>Status</th><th>Last Used</th><th></th></tr></thead>
+    <tbody>{% for token in tokens %}<tr>
+      <td>{{ token.name }}</td><td><code>{{ token.prefix }}</code></td><td>{{ token.user.name if token.user else 'System' }}</td><td>{{ 'Active' if token.is_active else 'Revoked' }}</td><td>{{ token.last_used_at or '' }}</td>
+      <td class="text-end">{% if token.is_active %}<a class="btn btn-sm btn-outline-danger" data-confirm="Revoke this API token?" href="{{ url_for('settings.revoke_api_token', id=token.id) }}"><i class="bi bi-slash-circle"></i></a>{% endif %}</td>
+    </tr>{% endfor %}</tbody>
+  </table>
+</div>
+{% endblock %}

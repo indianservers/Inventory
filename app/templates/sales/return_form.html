@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block content %}
+<form class="panel" method="post">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <div class="form-grid">
+    <div><label class="form-label">Return No</label><input class="form-control" name="return_no" value="{{ return_no }}" required></div>
+    <div><label class="form-label">Date</label><input class="form-control" type="date" name="return_date" value="{{ today }}" required></div>
+    <div><label class="form-label">Customer</label><select class="form-select" name="customer_id" required><option value="">Select</option>{% for x in customers %}<option value="{{ x.id }}">{{ x.name }}</option>{% endfor %}</select></div>
+    <div><label class="form-label">Warehouse</label><select class="form-select" name="warehouse_id" required><option value="">Select</option>{% for x in warehouses %}<option value="{{ x.id }}">{{ x.name }}</option>{% endfor %}</select></div>
+    <div><label class="form-label">Original Invoice</label><select class="form-select" name="sale_id"><option value="">None</option>{% for x in sales %}<option value="{{ x.id }}">{{ x.invoice_no }}</option>{% endfor %}</select></div>
+    <div><label class="form-label">Refund Mode</label><select class="form-select" name="refund_mode"><option>Credit Note</option><option>Cash Refund</option><option>Bank Refund</option></select></div>
+  </div>
+  <hr><div class="d-flex justify-content-between"><h2 class="h6">Items</h2><button class="btn btn-sm btn-outline-primary" id="add-row" type="button"><i class="bi bi-plus-lg"></i></button></div><div id="items" class="mt-2"></div>
+  {% include "shared/totals.html" %}
+  <label class="form-label mt-3">Reason</label><textarea class="form-control" name="reason"></textarea>
+  <label class="form-label mt-3">Notes</label><textarea class="form-control" name="notes"></textarea>
+  <div class="sticky-actions d-flex justify-content-between align-items-center"><span class="text-muted">Review return totals before saving.</span><button class="btn btn-primary">Save Return</button></div>
+</form>
+{% endblock %}
+{% block scripts %}<script src="{{ url_for('static', filename='js/invoice.js') }}"></script><script>document.addEventListener("DOMContentLoaded",()=>initInvoiceForm("sale"));</script>{% endblock %}

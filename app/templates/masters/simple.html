@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="row g-3">
+  <div class="col-lg-4">
+    <form class="panel" method="post">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <h2 class="h5">Add {{ title[:-1] }}</h2>
+      <label class="form-label">Name</label><input class="form-control mb-3" name="name" required>
+      {% if title == 'Units' %}
+      <label class="form-label">Short Name</label><input class="form-control mb-3" name="short_name" required>
+      <label class="form-check mb-3"><input class="form-check-input" type="checkbox" name="decimal_allowed"> Decimal allowed</label>
+      {% endif %}
+      {% if title == 'Categories' %}
+      <label class="form-label">Parent</label><select class="form-select mb-3" name="parent_id"><option value="">None</option>{% for p in parents %}<option value="{{ p.id }}">{{ p.name }}</option>{% endfor %}</select>
+      {% endif %}
+      <label class="form-label">Description</label><textarea class="form-control mb-3" name="description"></textarea>
+      <label class="form-check mb-3"><input class="form-check-input" type="checkbox" name="status" checked> Active</label>
+      <button class="btn btn-primary">Save</button>
+    </form>
+  </div>
+  <div class="col-lg-8">
+    <div class="panel">
+      <table class="table datatable">
+        <thead><tr>{% for _, label in fields %}<th>{{ label }}</th>{% endfor %}<th>Status</th><th></th></tr></thead>
+        <tbody>{% for item in items %}<tr>{% for field, _ in fields %}<td>{{ item|attr(field) }}</td>{% endfor %}<td>{{ 'Active' if item.status else 'Inactive' }}</td><td class="table-actions"><a class="btn btn-sm btn-outline-danger" data-confirm="Delete this record?" href="{{ request.path }}/{{ item.id }}/delete"><i class="bi bi-trash"></i></a></td></tr>{% endfor %}</tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}
+

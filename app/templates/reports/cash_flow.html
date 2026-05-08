@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="panel">
+  <button class="btn btn-outline-secondary mb-3" onclick="window.print()"><i class="bi bi-printer"></i> Print</button>
+  <table class="table align-middle">
+    <thead><tr><th>Activity</th><th class="text-end">Inflow</th><th class="text-end">Outflow</th></tr></thead>
+    <tbody>{% for row in rows %}<tr><td>{{ row.label }}</td><td class="text-end">{{ "%.2f"|format(row.inflow) }}</td><td class="text-end">{{ "%.2f"|format(row.outflow) }}</td></tr>{% endfor %}</tbody>
+    <tfoot><tr><th>Net Cash Flow</th><th colspan="2" class="text-end">{{ "%.2f"|format(net_cash) }}</th></tr></tfoot>
+  </table>
+</div>
+{% endblock %}

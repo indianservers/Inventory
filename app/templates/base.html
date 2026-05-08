@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="csrf-token" content="{{ csrf_token() }}">
+  <title>{{ title or app_name }}</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+  <link href="https://cdn.datatables.net/2.0.8/css/dataTables.bootstrap5.css" rel="stylesheet">
+  <link href="{{ url_for('static', filename='css/app.css') }}" rel="stylesheet">
+</head>
+<body data-theme="{{ request.cookies.get('theme','light') }}" data-density="{{ request.cookies.get('density','comfortable') }}">
+{% if current_user.is_authenticated %}
+<aside class="sidebar">
+  <div class="brand"><i class="bi bi-box-seam"></i> Vyapara ERP</div>
+  <nav>
+    <a href="{{ url_for('dashboard.index') }}"><i class="bi bi-speedometer2"></i> Dashboard</a>
+    <div class="nav-title">Masters</div>
+    <a href="{{ url_for('products.index') }}"><i class="bi bi-box"></i> Products</a>
+    <a href="{{ url_for('masters.categories') }}"><i class="bi bi-diagram-3"></i> Categories</a>
+    <a href="{{ url_for('masters.brands') }}"><i class="bi bi-tags"></i> Brands</a>
+    <a href="{{ url_for('masters.units') }}"><i class="bi bi-rulers"></i> Units</a>
+    <a href="{{ url_for('masters.warehouses') }}"><i class="bi bi-buildings"></i> Warehouses</a>
+    <div class="nav-title">Parties</div>
+    <a href="{{ url_for('parties.customers') }}"><i class="bi bi-people"></i> Customers</a>
+    <a href="{{ url_for('parties.suppliers') }}"><i class="bi bi-truck"></i> Suppliers</a>
+    <div class="nav-title">Transactions</div>
+    <a href="{{ url_for('purchases.index') }}"><i class="bi bi-cart-plus"></i> Purchases</a>
+    <a href="{{ url_for('sales.index') }}"><i class="bi bi-receipt"></i> Sales</a>
+    <a href="{{ url_for('sales.quotations') }}"><i class="bi bi-file-earmark-text"></i> Quotations</a>
+    <a href="{{ url_for('stock.current') }}"><i class="bi bi-boxes"></i> Stock</a>
+    <a href="{{ url_for('accounts.receipts') }}"><i class="bi bi-cash-coin"></i> Receipts</a>
+    <a href="{{ url_for('accounts.payments') }}"><i class="bi bi-wallet2"></i> Payments</a>
+    <a href="{{ url_for('accounts.expenses') }}"><i class="bi bi-graph-down-arrow"></i> Expenses</a>
+    <div class="nav-title">Accounts</div>
+    <a href="{{ url_for('accounts.chart') }}"><i class="bi bi-journal-bookmark"></i> Chart of Accounts</a>
+    <a href="{{ url_for('accounts.journals') }}"><i class="bi bi-journal-text"></i> Journals</a>
+    <a href="{{ url_for('reports.index') }}"><i class="bi bi-bar-chart"></i> Reports</a>
+    <div class="nav-title">Settings</div>
+    <a href="{{ url_for('settings.company') }}"><i class="bi bi-gear"></i> Company Settings</a>
+    <a href="{{ url_for('settings.users') }}"><i class="bi bi-person-gear"></i> Users & Roles</a>
+    <a href="{{ url_for('settings.api_tokens') }}"><i class="bi bi-key"></i> API Tokens</a>
+    <a href="{{ url_for('settings.audit') }}"><i class="bi bi-clock-history"></i> Audit Trail</a>
+    <a href="{{ url_for('settings.backup') }}"><i class="bi bi-database"></i> Backup</a>
+  </nav>
+</aside>
+<main class="content">
+  <header class="topbar">
+    <div>
+      <h1>{{ title or "Dashboard" }}</h1>
+      <small>{{ company.company_name if company else "Vyapara ERP" }}</small>
+    </div>
+    <form class="d-none d-lg-flex flex-grow-1 mx-4" action="{{ url_for('search.index') }}" method="get" style="max-width:520px">
+      <div class="input-group">
+        <span class="input-group-text"><i class="bi bi-search"></i></span>
+        <input class="form-control global-search" name="q" placeholder="Search products, parties, invoices" value="{{ request.args.get('q','') }}">
+      </div>
+    </form>
+    <div class="d-flex gap-2 align-items-center">
+      <div class="dropdown">
+        <button class="btn btn-sm btn-primary dropdown-toggle" data-bs-toggle="dropdown"><i class="bi bi-plus-lg"></i></button>
+        <div class="dropdown-menu dropdown-menu-end">
+          <a class="dropdown-item" href="{{ url_for('products.create') }}">Product</a>
+          <a class="dropdown-item" href="{{ url_for('parties.customer_create') }}">Customer</a>
+          <a class="dropdown-item" href="{{ url_for('parties.supplier_create') }}">Supplier</a>
+          <a class="dropdown-item" href="{{ url_for('sales.create') }}">Sales Invoice</a>
+          <a class="dropdown-item" href="{{ url_for('accounts.receipts') }}">Receipt</a>
+        </div>
+      </div>
+      <button class="btn btn-sm btn-outline-secondary" id="theme-toggle" title="Toggle theme"><i class="bi bi-moon"></i></button>
+      <button class="btn btn-sm btn-outline-secondary" id="density-toggle" title="Toggle table density"><i class="bi bi-arrows-collapse"></i></button>
+      <span class="badge text-bg-primary">{{ current_user.role.name }}</span>
+      <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('auth.profile') }}"><i class="bi bi-person-circle"></i></a>
+      <a class="btn btn-sm btn-outline-danger" href="{{ url_for('auth.logout') }}"><i class="bi bi-box-arrow-right"></i></a>
+    </div>
+  </header>
+  {% include "_flash.html" %}
+  {% block content %}{% endblock %}
+  <nav class="mobile-bottom-nav">
+    <a href="{{ url_for('dashboard.index') }}"><i class="bi bi-speedometer2"></i></a>
+    <a href="{{ url_for('products.index') }}"><i class="bi bi-box"></i></a>
+    <a href="{{ url_for('sales.create') }}"><i class="bi bi-plus-circle"></i></a>
+    <a href="{{ url_for('reports.index') }}"><i class="bi bi-bar-chart"></i></a>
+    <a href="{{ url_for('search.index') }}"><i class="bi bi-search"></i></a>
+  </nav>
+</main>
+{% else %}
+  {% include "_flash.html" %}
+  {% block auth_content %}{% endblock %}
+{% endif %}
+<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.datatables.net/2.0.8/js/dataTables.js"></script>
+<script src="https://cdn.datatables.net/2.0.8/js/dataTables.bootstrap5.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="{{ url_for('static', filename='js/common.js') }}"></script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

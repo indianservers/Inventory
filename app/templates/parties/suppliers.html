@@ -1,0 +1,6 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="panel"><div class="d-flex justify-content-between mb-3"><h2 class="h5">Suppliers</h2><a class="btn btn-primary" href="{{ url_for('parties.supplier_create') }}"><i class="bi bi-plus-lg"></i> Supplier</a></div>
+<table class="table datatable"><thead><tr><th>Code</th><th>Name</th><th>Phone</th><th>Email</th><th>Outstanding</th><th></th></tr></thead><tbody>{% for i in items %}<tr><td>{{ i.supplier_code }}</td><td>{{ i.name }}</td><td>{{ i.phone }}</td><td>{{ i.email }}</td><td>{{ "%.2f"|format(i.outstanding) }}</td><td class="table-actions"><a class="btn btn-sm btn-outline-secondary" href="{{ url_for('parties.supplier_ledger', id=i.id) }}"><i class="bi bi-journal"></i></a><a class="btn btn-sm btn-outline-primary" href="{{ url_for('parties.supplier_edit', id=i.id) }}"><i class="bi bi-pencil"></i></a></td></tr>{% endfor %}</tbody></table></div>
+{% endblock %}
+

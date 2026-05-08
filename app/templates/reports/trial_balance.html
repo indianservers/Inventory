@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="panel">
+  <button class="btn btn-outline-secondary mb-3" onclick="window.print()"><i class="bi bi-printer"></i> Print</button>
+  <table class="table datatable align-middle">
+    <thead><tr><th>Code</th><th>Account</th><th>Group</th><th>Type</th><th>Debit</th><th>Credit</th></tr></thead>
+    <tbody>{% for row in rows %}<tr><td>{{ row.code }}</td><td>{{ row.name }}</td><td>{{ row.group }}</td><td>{{ row.type }}</td><td>{{ "%.2f"|format(row.debit) }}</td><td>{{ "%.2f"|format(row.credit) }}</td></tr>{% endfor %}</tbody>
+    <tfoot><tr><th colspan="4">Total</th><th>{{ "%.2f"|format(total_debit) }}</th><th>{{ "%.2f"|format(total_credit) }}</th></tr></tfoot>
+  </table>
+</div>
+{% endblock %}

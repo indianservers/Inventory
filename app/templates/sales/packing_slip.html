@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="panel print-template">
+  <div class="d-flex justify-content-between">
+    <div><h2>Packing Slip</h2><p>{{ sale.invoice_no }}<br>{{ sale.invoice_date }}</p></div>
+    <div class="text-end"><strong>{{ company.company_name if company }}</strong><br>{{ company.phone if company }}</div>
+  </div>
+  <p><strong>Customer:</strong> {{ sale.customer.name }}<br><strong>Ship To:</strong> {{ sale.customer.shipping_address or sale.customer.billing_address or '' }}</p>
+  <table class="table">
+    <thead><tr><th>SKU</th><th>Item</th><th>Qty</th><th>Checked</th></tr></thead>
+    <tbody>{% for item in sale.items %}<tr><td>{{ item.product.sku }}</td><td>{{ item.product.name }}</td><td>{{ item.quantity }}</td><td>[ ]</td></tr>{% endfor %}</tbody>
+  </table>
+  <button class="btn btn-outline-secondary print-hide" onclick="window.print()">Print</button>
+</div>
+{% endblock %}

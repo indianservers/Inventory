@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="panel">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <button class="btn btn-outline-secondary" onclick="window.print()"><i class="bi bi-printer"></i> Print</button>
+    <div class="h5 mb-0">Total Value: {{ "%.2f"|format(total_value) }}</div>
+  </div>
+  <table class="table datatable align-middle">
+    <thead><tr><th>SKU</th><th>Product</th><th>Warehouse</th><th>Qty</th><th>Average Cost</th><th>Stock Value</th></tr></thead>
+    <tbody>{% for p in products %}<tr>
+      <td>{{ p.sku }}</td><td>{{ p.name }}</td><td>{{ p.warehouse.name if p.warehouse }}</td><td>{{ p.current_stock }}</td><td>{{ p.average_cost }}</td><td>{{ "%.2f"|format(p.stock_value) }}</td>
+    </tr>{% endfor %}</tbody>
+  </table>
+</div>
+{% endblock %}

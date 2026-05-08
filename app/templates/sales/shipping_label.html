@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="panel print-template">
+  <div class="border rounded p-4" style="max-width:520px">
+    <div class="text-uppercase text-muted small">Ship To</div>
+    <h2>{{ sale.customer.name }}</h2>
+    <p class="fs-5">{{ sale.customer.shipping_address or sale.customer.billing_address or '' }}<br>{{ sale.customer.city or '' }} {{ sale.customer.state or '' }} {{ sale.customer.postal_code or '' }}<br>{{ sale.customer.phone or '' }}</p>
+    <hr>
+    <div class="d-flex justify-content-between">
+      <div><strong>Invoice</strong><br>{{ sale.invoice_no }}</div>
+      <div><strong>Date</strong><br>{{ sale.invoice_date }}</div>
+      <div><strong>Pieces</strong><br>{{ sale.items.count() }}</div>
+    </div>
+  </div>
+  <button class="btn btn-outline-secondary mt-3 print-hide" onclick="window.print()">Print</button>
+</div>
+{% endblock %}
