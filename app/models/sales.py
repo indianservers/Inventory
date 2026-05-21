@@ -10,6 +10,7 @@ class Sale(db.Model):
     customer_id = db.Column(db.Integer, db.ForeignKey('customers.id'), nullable=False)
     warehouse_id = db.Column(db.Integer, db.ForeignKey('warehouses.id'), nullable=False)
     sale_type = db.Column(db.String(10), default='Credit')  # Cash, Credit
+    status = db.Column(db.String(20), default='Issued')  # Draft, Issued, Partially Paid, Paid, Overdue, Cancelled
     subtotal = db.Column(db.Numeric(12, 2), default=0)
     discount_total = db.Column(db.Numeric(12, 2), default=0)
     tax_total = db.Column(db.Numeric(12, 2), default=0)
@@ -23,6 +24,10 @@ class Sale(db.Model):
     notes = db.Column(db.Text)
     terms = db.Column(db.Text)
     created_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+    updated_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+    issued_at = db.Column(db.DateTime)
+    cancelled_at = db.Column(db.DateTime)
+    cancellation_reason = db.Column(db.Text)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     items = db.relationship('SaleItem', backref='sale', lazy='dynamic', cascade='all, delete-orphan')
@@ -38,6 +43,23 @@ class Sale(db.Model):
         else:
             self.payment_status = 'Partial'
         self.balance_amount = total - paid
+        if self.status != "Cancelled":
+            if self.payment_status == "Paid":
+                self.status = "Paid"
+            elif self.payment_status == "Partial":
+                self.status = "Partially Paid"
+            elif self.status != "Draft":
+                self.status = "Issued"
+
+    @property
+    def display_status(self):
+        from datetime import date
+
+        if self.status in ["Draft", "Cancelled", "Paid"]:
+            return self.status
+        if self.balance_amount and float(self.balance_amount or 0) > 0 and self.due_date and self.due_date < date.today():
+            return "Overdue"
+        return self.status or self.payment_status or "Issued"
 
     def __repr__(self):
         return f'<Sale {self.invoice_no}>'

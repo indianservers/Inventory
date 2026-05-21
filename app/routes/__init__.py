@@ -6,6 +6,7 @@ def register_blueprints(app):
     from app.routes.product_routes import bp as product_bp
     from app.routes.purchase_routes import bp as purchase_bp
     from app.routes.sales_routes import bp as sales_bp
+    from app.routes.invoice_routes import bp as invoice_bp
     from app.routes.stock_routes import bp as stock_bp
     from app.routes.accounts_routes import bp as accounts_bp
     from app.routes.reports_routes import bp as reports_bp
@@ -21,6 +22,7 @@ def register_blueprints(app):
         product_bp,
         purchase_bp,
         sales_bp,
+        invoice_bp,
         stock_bp,
         accounts_bp,
         reports_bp,

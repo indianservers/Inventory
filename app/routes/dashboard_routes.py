@@ -15,11 +15,11 @@ def index():
     metrics = dashboard_metrics()
     sales_monthly = [0] * 12
     purchase_monthly = [0] * 12
-    for month, total in db.session.query(extract("month", Sale.invoice_date), func.sum(Sale.grand_total)).group_by(extract("month", Sale.invoice_date)):
+    for month, total in db.session.query(extract("month", Sale.invoice_date), func.sum(Sale.grand_total)).filter(Sale.status.notin_(["Draft", "Cancelled"])).group_by(extract("month", Sale.invoice_date)):
         sales_monthly[int(month) - 1] = float(total or 0)
     for month, total in db.session.query(extract("month", Purchase.purchase_date), func.sum(Purchase.grand_total)).group_by(extract("month", Purchase.purchase_date)):
         purchase_monthly[int(month) - 1] = float(total or 0)
-    recent_invoices = Sale.query.order_by(Sale.id.desc()).limit(8).all()
+    recent_invoices = Sale.query.filter(Sale.status != "Cancelled").order_by(Sale.id.desc()).limit(8).all()
     recent_payments = PaymentReceived.query.order_by(PaymentReceived.id.desc()).limit(8).all()
     top_products = db.session.query(Product.name, func.coalesce(func.sum(SaleItem.quantity), 0)).join(SaleItem, SaleItem.product_id == Product.id, isouter=True).group_by(Product.id).limit(10).all()
     cash_balance = sum(float(p.amount or 0) for p in PaymentReceived.query.all()) - sum(float(p.amount or 0) for p in PaymentMade.query.all())

@@ -173,7 +173,7 @@ def sales():
         query = query.filter(Sale.warehouse_id == request.args["warehouse_id"])
     if request.args.get("status"):
         query = query.filter(Sale.payment_status == request.args["status"])
-    return jsonify(paginated_response(query, lambda s: {"id": s.id, "invoice_no": s.invoice_no, "date": s.invoice_date.isoformat(), "customer": s.customer.name, "status": s.payment_status, "total": float(s.grand_total)}, {"date": Sale.invoice_date, "total": Sale.grand_total, "invoice_no": Sale.invoice_no}))
+    return jsonify(paginated_response(query, lambda s: {"id": s.id, "invoice_no": s.invoice_no, "date": s.invoice_date.isoformat(), "customer": s.customer.name, "status": s.display_status, "total": float(s.grand_total)}, {"date": Sale.invoice_date, "total": Sale.grand_total, "invoice_no": Sale.invoice_no}))
 
 
 @bp.route("/sales/<int:id>")
@@ -181,6 +181,24 @@ def sales():
 def sale_detail(id):
     s = Sale.query.get_or_404(id)
     return jsonify({"id": s.id, "invoice_no": s.invoice_no, "customer": s.customer.name, "total": float(s.grand_total), "items": [{"product": i.product.name, "qty": float(i.quantity), "total": float(i.line_total)} for i in s.items]})
+
+
+@bp.route("/invoices")
+@login_required
+def invoices():
+    query = apply_date_filters(Sale.query, Sale, "invoice_date")
+    if request.args.get("customer_id"):
+        query = query.filter(Sale.customer_id == request.args["customer_id"])
+    if request.args.get("status"):
+        query = query.filter(Sale.status == request.args["status"])
+    return jsonify(paginated_response(query, lambda s: {"id": s.id, "invoice_no": s.invoice_no, "date": s.invoice_date.isoformat(), "due_date": s.due_date.isoformat() if s.due_date else None, "customer": s.customer.name, "status": s.display_status, "total": float(s.grand_total or 0), "paid": float(s.paid_amount or 0), "balance": float(s.balance_amount or 0)}, {"date": Sale.invoice_date, "total": Sale.grand_total, "invoice_no": Sale.invoice_no}))
+
+
+@bp.route("/invoices/<int:id>")
+@login_required
+def invoice_detail(id):
+    s = Sale.query.get_or_404(id)
+    return jsonify({"id": s.id, "invoice_no": s.invoice_no, "status": s.display_status, "customer": s.customer.name, "subtotal": float(s.subtotal or 0), "discount_total": float(s.discount_total or 0), "tax_total": float(s.tax_total or 0), "total": float(s.grand_total or 0), "paid": float(s.paid_amount or 0), "balance": float(s.balance_amount or 0), "items": [{"product": i.product.name, "qty": float(i.quantity), "rate": float(i.rate), "tax_rate": float(i.tax_rate or 0), "total": float(i.line_total)} for i in s.items]})
 
 
 @bp.route("/purchases")

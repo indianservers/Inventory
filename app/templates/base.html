@@ -27,7 +27,8 @@
     <a href="{{ url_for('parties.suppliers') }}"><i class="bi bi-truck"></i> Suppliers</a>
     <div class="nav-title">Transactions</div>
     <a href="{{ url_for('purchases.index') }}"><i class="bi bi-cart-plus"></i> Purchases</a>
-    <a href="{{ url_for('sales.index') }}"><i class="bi bi-receipt"></i> Sales</a>
+    <a href="{{ url_for('invoices.index') }}"><i class="bi bi-receipt"></i> Invoices</a>
+    <a href="{{ url_for('sales.index') }}"><i class="bi bi-bag-check"></i> Sales</a>
     <a href="{{ url_for('sales.quotations') }}"><i class="bi bi-file-earmark-text"></i> Quotations</a>
     <a href="{{ url_for('stock.current') }}"><i class="bi bi-boxes"></i> Stock</a>
     <a href="{{ url_for('accounts.receipts') }}"><i class="bi bi-cash-coin"></i> Receipts</a>
@@ -64,7 +65,7 @@
           <a class="dropdown-item" href="{{ url_for('products.create') }}">Product</a>
           <a class="dropdown-item" href="{{ url_for('parties.customer_create') }}">Customer</a>
           <a class="dropdown-item" href="{{ url_for('parties.supplier_create') }}">Supplier</a>
-          <a class="dropdown-item" href="{{ url_for('sales.create') }}">Sales Invoice</a>
+          <a class="dropdown-item" href="{{ url_for('invoices.create') }}">Invoice</a>
           <a class="dropdown-item" href="{{ url_for('accounts.receipts') }}">Receipt</a>
         </div>
       </div>
@@ -80,7 +81,7 @@
   <nav class="mobile-bottom-nav">
     <a href="{{ url_for('dashboard.index') }}"><i class="bi bi-speedometer2"></i></a>
     <a href="{{ url_for('products.index') }}"><i class="bi bi-box"></i></a>
-    <a href="{{ url_for('sales.create') }}"><i class="bi bi-plus-circle"></i></a>
+    <a href="{{ url_for('invoices.create') }}"><i class="bi bi-plus-circle"></i></a>
     <a href="{{ url_for('reports.index') }}"><i class="bi bi-bar-chart"></i></a>
     <a href="{{ url_for('search.index') }}"><i class="bi bi-search"></i></a>
   </nav>

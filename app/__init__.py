@@ -52,6 +52,9 @@ def create_app():
     from app.routes import register_blueprints
 
     register_blueprints(app)
+    from app.services.schema_service import ensure_invoice_schema
+
+    ensure_invoice_schema(app)
 
     @app.context_processor
     def inject_globals():

@@ -18,7 +18,7 @@ def index():
 @bp.route("/sales")
 @login_required
 def sales_report():
-    return render_template("reports/table.html", title="Sales Report", rows=Sale.query.order_by(Sale.invoice_date.desc()).all(), columns=["invoice_no", "invoice_date", "grand_total", "payment_status"])
+    return render_template("reports/table.html", title="Invoice Sales Report", rows=Sale.query.filter(Sale.status.notin_(["Draft", "Cancelled"])).order_by(Sale.invoice_date.desc()).all(), columns=["invoice_no", "invoice_date", "grand_total", "paid_amount", "balance_amount", "status"])
 
 
 @bp.route("/purchases")
@@ -72,7 +72,7 @@ def inventory_ledger():
 @bp.route("/profit-loss")
 @login_required
 def profit_loss():
-    sales = sum(float(s.grand_total or 0) for s in Sale.query.all())
+    sales = sum(float(s.grand_total or 0) for s in Sale.query.filter(Sale.status.notin_(["Draft", "Cancelled"])).all())
     purchases = sum(float(p.grand_total or 0) for p in Purchase.query.all())
     return render_template("reports/profit_loss.html", title="Profit and Loss", sales=sales, purchases=purchases, profit=sales - purchases)
 
@@ -136,7 +136,7 @@ def cash_flow():
 @bp.route("/tax-summary")
 @login_required
 def tax_summary():
-    sales_tax = float(db_sum(Sale.tax_total))
+    sales_tax = float(db.session.query(func.coalesce(func.sum(Sale.tax_total), 0)).filter(Sale.status.notin_(["Draft", "Cancelled"])).scalar())
     purchase_tax = float(db_sum(Purchase.tax_total))
     expense_tax = float(db_sum(Expense.tax_amount))
     return render_template("reports/tax_summary.html", title="Tax Summary", sales_tax=sales_tax, purchase_tax=purchase_tax, expense_tax=expense_tax, net_tax=sales_tax - purchase_tax - expense_tax)

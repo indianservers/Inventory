@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, datetime
 
 from urllib.parse import quote_plus
 
@@ -82,7 +82,8 @@ def create():
         try:
             items = parse_items()
             totals = calculate_document(items, shipping=request.form.get("shipping_charges"), round_off=request.form.get("round_off"), paid=request.form.get("paid_amount"))
-            sale = Sale(invoice_no=request.form.get("invoice_no") or next_number("sales"), invoice_date=date.fromisoformat(request.form["invoice_date"]), customer_id=request.form["customer_id"], warehouse_id=request.form["warehouse_id"], sale_type=request.form.get("sale_type") or "Credit", notes=request.form.get("notes"), terms=request.form.get("terms"), created_by=current_user.id, **totals)
+            sale = Sale(invoice_no=request.form.get("invoice_no") or next_number("sales"), invoice_date=date.fromisoformat(request.form["invoice_date"]), due_date=date.fromisoformat(request.form["due_date"]) if request.form.get("due_date") else None, customer_id=request.form["customer_id"], warehouse_id=request.form["warehouse_id"], sale_type=request.form.get("sale_type") or "Credit", notes=request.form.get("notes"), terms=request.form.get("terms"), created_by=current_user.id, issued_at=datetime.utcnow(), **totals)
+            sale.update_payment_status()
             db.session.add(sale); db.session.flush()
             for item in items:
                 cost = apply_sale_item(item["product_id"], sale.warehouse_id, item["quantity"], sale.id, sale.invoice_no)

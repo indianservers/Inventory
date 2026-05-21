@@ -33,7 +33,7 @@
   <div class="col-lg-6">
     <div class="panel">
       <h2 class="h6">Recent Invoices</h2>
-      <table class="table table-sm">{% for s in recent_invoices %}<tr><td>{{ s.invoice_no }}</td><td>{{ s.customer.name }}</td><td class="text-end">{{ s.grand_total }}</td></tr>{% else %}<tr><td>No invoices yet</td></tr>{% endfor %}</table>
+      <table class="table table-sm">{% for s in recent_invoices %}<tr><td><a href="{{ url_for('invoices.detail', id=s.id) }}">{{ s.invoice_no }}</a></td><td>{{ s.customer.name }}</td><td>{{ s.display_status }}</td><td class="text-end">{{ s.grand_total }}</td></tr>{% else %}<tr><td>No invoices yet</td></tr>{% endfor %}</table>
     </div>
   </div>
   <div class="col-lg-6">
@@ -55,4 +55,3 @@ new Chart(document.getElementById('monthlyChart'), {
 });
 </script>
 {% endblock %}
-

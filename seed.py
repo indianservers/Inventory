@@ -25,7 +25,7 @@ from app.models import (
 app = create_app()
 
 ROLES = ["Super Admin", "Admin", "Accountant", "Sales Executive", "Purchase Executive", "Stock Manager", "Viewer"]
-MODULES = ["dashboard", "products", "categories", "brands", "units", "warehouses", "customers", "suppliers", "purchases", "sales", "returns", "quotations", "payments", "stock", "accounts", "expenses", "reports", "settings", "backup", "audit"]
+MODULES = ["dashboard", "products", "categories", "brands", "units", "warehouses", "customers", "suppliers", "purchases", "sales", "invoices", "returns", "quotations", "payments", "stock", "accounts", "expenses", "reports", "settings", "backup", "audit"]
 ACTIONS = ["view", "create", "edit", "delete", "print", "export", "approve"]
 
 
@@ -55,7 +55,7 @@ with app.app_context():
             allowed = role_name in ["Super Admin", "Admin"] or perm.action == "view"
             if role_name == "Accountant" and perm.module in ["accounts", "payments", "expenses", "reports"]:
                 allowed = True
-            if role_name == "Sales Executive" and perm.module in ["sales", "customers", "quotations", "reports"]:
+            if role_name == "Sales Executive" and perm.module in ["sales", "invoices", "customers", "quotations", "reports"]:
                 allowed = perm.action != "delete"
             if role_name == "Purchase Executive" and perm.module in ["purchases", "suppliers", "reports"]:
                 allowed = perm.action != "delete"
@@ -107,4 +107,3 @@ with app.app_context():
 
     db.session.commit()
     print("Seed data inserted. Login: admin@example.com / admin123")
-

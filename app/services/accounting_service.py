@@ -55,6 +55,19 @@ def post_sale(sale, user_id=None):
     create_journal(sale.invoice_date, "Sale", sale.id, f"Sale {sale.invoice_no}", lines, user_id)
 
 
+def reverse_sale(sale, user_id=None, reason=None):
+    customer = Customer.query.get(sale.customer_id)
+    customer.current_balance = money(customer.current_balance) - money(sale.balance_amount)
+    db.session.add(CustomerLedger(date=date.today(), customer_id=sale.customer_id, reference_type="SaleCancellation", reference_id=sale.id, reference_no=sale.invoice_no, debit=0, credit=sale.balance_amount, balance=customer.outstanding - float(sale.balance_amount or 0), narration=reason or "Sales invoice cancelled"))
+    lines = [
+        {"account": account("Sales"), "debit": money(sale.grand_total) - money(sale.tax_total)},
+        {"account": account("Accounts Receivable"), "credit": sale.grand_total},
+    ]
+    if money(sale.tax_total) > 0:
+        lines.append({"account": account("Tax Payable"), "debit": sale.tax_total})
+    create_journal(date.today(), "SaleCancellation", sale.id, f"Cancel sale {sale.invoice_no}", lines, user_id)
+
+
 def post_purchase(purchase, user_id=None):
     supplier = Supplier.query.get(purchase.supplier_id)
     supplier.current_balance = money(supplier.current_balance) + money(purchase.balance_amount)

@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block content %}
+<form class="panel" method="post" action="{{ form_action }}">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <div class="form-grid">
+    <div><label class="form-label">Invoice No</label><input class="form-control" name="invoice_no" value="{{ invoice.invoice_no }}" required></div>
+    <div><label class="form-label">Invoice Date</label><input class="form-control" type="date" name="invoice_date" value="{{ invoice.invoice_date }}" required></div>
+    <div><label class="form-label">Due Date</label><input class="form-control" type="date" name="due_date" value="{{ invoice.due_date or '' }}"></div>
+    <div><label class="form-label">Customer</label><select class="form-select" name="customer_id" required><option value="">Select</option>{% for customer in customers %}<option value="{{ customer.id }}" {% if invoice.customer_id == customer.id %}selected{% endif %}>{{ customer.name }}{% if customer.outstanding %} | Due {{ "%.2f"|format(customer.outstanding) }}{% endif %}</option>{% endfor %}</select></div>
+    <div><label class="form-label">Warehouse</label><select class="form-select" name="warehouse_id" required><option value="">Select</option>{% for warehouse in warehouses %}<option value="{{ warehouse.id }}" {% if invoice.warehouse_id == warehouse.id %}selected{% endif %}>{{ warehouse.name }}</option>{% endfor %}</select></div>
+    <div><label class="form-label">Sales Type</label><select class="form-select" name="sale_type"><option {% if invoice.sale_type == 'Credit' %}selected{% endif %}>Credit</option><option {% if invoice.sale_type == 'Cash' %}selected{% endif %}>Cash</option></select></div>
+  </div>
+  <hr>
+  <div class="d-flex justify-content-between align-items-center">
+    <h2 class="h6 mb-0">Items</h2>
+    <button class="btn btn-sm btn-outline-primary" id="add-row" type="button"><i class="bi bi-plus-lg"></i></button>
+  </div>
+  <div id="items" class="mt-2">
+    {% for item in invoice.items %}
+    <div class="item-row mb-2">
+      <select name="product_id[]" class="form-select product-select" required><option value="">Product</option>{% for product in products %}<option value="{{ product.id }}" data-price="{{ product.sales_price }}" data-cost="{{ product.purchase_price }}" data-tax="{{ product.tax.rate if product.tax else 0 }}" data-stock="{{ product.current_stock }}" {% if item.product_id == product.id %}selected{% endif %}>{{ product.sku }} - {{ product.name }}{% if product.current_stock <= 0 %} (Out){% endif %}</option>{% endfor %}</select>
+      <input name="quantity[]" class="form-control qty" type="number" min="0.001" step="0.001" value="{{ item.quantity }}">
+      <input name="rate[]" class="form-control rate" type="number" min="0" step="0.01" value="{{ item.rate }}">
+      <input name="discount[]" class="form-control discount" type="number" min="0" step="0.01" value="{{ item.discount or 0 }}">
+      <input name="tax_rate[]" class="form-control tax" type="number" min="0" step="0.01" value="{{ item.tax_rate or 0 }}">
+      <input class="form-control line-total" readonly value="{{ item.line_total }}">
+      <button class="btn btn-outline-danger remove-row" type="button"><i class="bi bi-trash"></i></button>
+      <div class="stock-hint small text-muted">Available: {{ item.product.current_stock }}</div>
+    </div>
+    {% endfor %}
+  </div>
+  {% include "shared/totals.html" %}
+  <label class="form-label mt-3">Terms</label><textarea class="form-control" name="terms">{{ invoice.terms or (company.default_invoice_terms if company else '') }}</textarea>
+  <label class="form-label mt-3">Notes</label><textarea class="form-control" name="notes">{{ invoice.notes or '' }}</textarea>
+  <div class="sticky-actions d-flex justify-content-between align-items-center">
+    <a class="btn btn-outline-secondary" href="{{ url_for('invoices.index') }}">Back</a>
+    <div class="d-flex gap-2"><button class="btn btn-outline-primary" name="action" value="draft">Save Draft</button><button class="btn btn-primary" name="action" value="issue">Issue Invoice</button></div>
+  </div>
+</form>
+{% endblock %}
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/invoice.js') }}"></script>
+<script>document.addEventListener("DOMContentLoaded",()=>{initInvoiceForm("sale"); setTimeout(calculateInvoice, 80);});</script>
+{% endblock %}

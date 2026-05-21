@@ -77,6 +77,11 @@ def apply_sales_return_item(product_id, warehouse_id, quantity, rate, return_id,
     add_inventory_entry(product, warehouse_id, "Sales Return", "SalesReturn", return_id, return_no, qty_in=quantity, rate=rate)
 
 
+def reverse_sale_item(product_id, warehouse_id, quantity, rate, sale_id, invoice_no, notes=None):
+    product = Product.query.get_or_404(product_id)
+    add_inventory_entry(product, warehouse_id, "Sale Cancellation", "Sale", sale_id, invoice_no, qty_in=quantity, rate=rate, notes=notes or "Invoice cancelled")
+
+
 def apply_purchase_return_item(product_id, warehouse_id, quantity, rate, return_id, return_no):
     product = Product.query.get_or_404(product_id)
     add_inventory_entry(product, warehouse_id, "Purchase Return", "PurchaseReturn", return_id, return_no, qty_out=quantity, rate=rate)
