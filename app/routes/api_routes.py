@@ -1,7 +1,7 @@
 from datetime import date, datetime, timedelta
 from functools import wraps
 
-from flask import Blueprint, jsonify, render_template, request
+from flask import Blueprint, jsonify, render_template, request, url_for
 from flask_login import login_required
 from werkzeug.security import check_password_hash
 
@@ -28,16 +28,19 @@ def api_method_not_allowed(error):
 
 
 def product_json(p):
+    primary_image = p.images.filter_by(is_primary=True).first() or p.images.first()
     return {
         "id": p.id,
         "sku": p.sku,
         "barcode": p.barcode,
         "name": p.name,
+        "category": p.category.name if p.category else "Uncategorized",
         "sales_price": float(p.sales_price or 0),
         "purchase_price": float(p.purchase_price or 0),
         "current_stock": float(p.current_stock or 0),
         "average_cost": float(p.average_cost or 0),
         "tax_rate": float(p.tax.rate if p.tax else 0),
+        "image_url": url_for("static", filename=primary_image.image_path) if primary_image else None,
     }
 
 
