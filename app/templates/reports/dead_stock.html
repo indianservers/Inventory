@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block content %}
+<form class="panel mb-3 d-flex flex-wrap gap-2 align-items-end">
+  <div><label class="form-label">Days</label><input class="form-control" name="days" type="number" value="{{ days }}"></div>
+  <div><label class="form-label">Minimum Value</label><input class="form-control" name="min_value" type="number" step="0.01" value="{{ min_value }}"></div>
+  <button class="btn btn-primary">Filter</button>
+  <a class="btn btn-outline-success" href="{{ url_for('reports.dead_stock', days=days, min_value=min_value, export='xlsx') }}">Export Excel</a>
+</form>
+<div class="panel"><table class="table datatable"><thead><tr><th>SKU</th><th>Name</th><th>Current Stock</th><th>Stock Value</th><th>Last Sale</th><th>Days Since</th></tr></thead><tbody>{% for r in rows %}<tr><td>{{ r.product.sku }}</td><td>{{ r.product.name }}</td><td>{{ r.product.current_stock }}</td><td>{{ "%.2f"|format(r.stock_value) }}</td><td>{{ r.last_sale or 'Never' }}</td><td>{{ r.days_since or 'Never' }}</td></tr>{% endfor %}</tbody></table></div>
+{% endblock %}

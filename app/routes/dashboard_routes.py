@@ -24,3 +24,8 @@ def index():
     top_products = db.session.query(Product.name, func.coalesce(func.sum(SaleItem.quantity), 0)).join(SaleItem, SaleItem.product_id == Product.id, isouter=True).group_by(Product.id).limit(10).all()
     cash_balance = sum(float(p.amount or 0) for p in PaymentReceived.query.all()) - sum(float(p.amount or 0) for p in PaymentMade.query.all())
     return render_template("dashboard/index.html", title="Dashboard", metrics=metrics, sales_monthly=sales_monthly, purchase_monthly=purchase_monthly, recent_invoices=recent_invoices, recent_payments=recent_payments, top_products=top_products, cash_balance=cash_balance)
+
+
+@bp.route("/offline")
+def offline():
+    return render_template("offline.html")

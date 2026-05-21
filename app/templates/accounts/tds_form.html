@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block content %}
+<form class="panel" method="post">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <div class="form-grid">
+    <div><label class="form-label">Date</label><input class="form-control" type="date" name="entry_date" value="{{ today }}" required></div>
+    <div><label class="form-label">Party Type</label><select class="form-select" name="party_type"><option>Supplier</option><option>Customer</option></select></div>
+    <div><label class="form-label">Party ID</label><input class="form-control" name="party_id" required></div>
+    <div><label class="form-label">Section</label><select class="form-select" name="section_id">{% for s in sections %}<option value="{{ s.id }}">{{ s.section_code }} - {{ s.description }}</option>{% endfor %}</select></div>
+    <div><label class="form-label">Base Amount</label><input class="form-control" type="number" step="0.01" name="base_amount" required></div>
+    <div><label class="form-label">Rate %</label><input class="form-control" type="number" step="0.01" name="tds_rate"></div>
+    <div><label class="form-label">Reference Type</label><input class="form-control" name="reference_type"></div>
+    <div><label class="form-label">Reference No</label><input class="form-control" name="reference_no"></div>
+    <div><label class="form-label">Status</label><select class="form-select" name="status"><option>Pending</option><option>Deducted</option><option>Deposited</option></select></div>
+  </div>
+  <button class="btn btn-primary mt-3">Save TDS Entry</button>
+</form>
+{% endblock %}

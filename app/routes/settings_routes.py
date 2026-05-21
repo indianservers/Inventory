@@ -1,15 +1,18 @@
 import secrets
+from datetime import datetime
 from pathlib import Path
 
-from flask import Blueprint, current_app, flash, redirect, render_template, request, send_file, url_for
-from flask_login import login_required
+import requests
+from flask import Blueprint, current_app, flash, jsonify, redirect, render_template, render_template_string, request, send_file, url_for
+from flask_login import current_user, login_required
 from werkzeug.security import generate_password_hash
 from werkzeug.utils import secure_filename
 
 from app.extensions import db
-from app.models import ApiToken, AppSetting, AuditLog, CompanySetting, Permission, Role, RolePermission, Tax, User
+from app.models import ApiToken, AppSetting, AuditLog, CompanySetting, Currency, ExchangeRateLog, Permission, PrintTemplate, Role, RolePermission, ScheduledReport, Tax, User
 from app.services.audit_service import record_audit
 from app.services.backup_service import backup_uploads
+from app.services.report_mailer import send_due_reports, send_report_now
 
 bp = Blueprint("settings", __name__, url_prefix="/settings")
 
@@ -128,3 +131,162 @@ def backup():
 def backup_upload_files():
     path = backup_uploads()
     return send_file(path, as_attachment=True)
+
+
+@bp.route("/currencies", methods=["GET", "POST"])
+@login_required
+def currencies():
+    if request.method == "POST":
+        currency = Currency.query.filter_by(code=request.form["code"].upper()).first() or Currency(code=request.form["code"].upper())
+        currency.name = request.form["name"]
+        currency.symbol = request.form.get("symbol")
+        currency.exchange_rate = request.form.get("exchange_rate") or 1
+        currency.is_base = bool(request.form.get("is_base"))
+        currency.auto_update = bool(request.form.get("auto_update"))
+        if currency.is_base:
+            Currency.query.update({Currency.is_base: False})
+            currency.exchange_rate = 1
+        db.session.add(currency)
+        db.session.commit()
+        flash("Currency saved.", "success")
+        return redirect(url_for("settings.currencies"))
+    return render_template("settings/currencies.html", title="Currencies", currencies=Currency.query.order_by(Currency.code).all())
+
+
+@bp.route("/currencies/update-rates", methods=["POST"])
+@login_required
+def update_currency_rates():
+    response = requests.get("https://api.exchangerate-api.com/v4/latest/INR", timeout=15)
+    response.raise_for_status()
+    rates = response.json().get("rates", {})
+    for currency in Currency.query.filter(Currency.code != "INR").all():
+        rate = rates.get(currency.code)
+        if not rate:
+            continue
+        currency.exchange_rate = 1 / float(rate)
+        currency.last_updated = datetime.utcnow()
+        db.session.add(ExchangeRateLog(currency_id=currency.id, rate=currency.exchange_rate))
+    db.session.commit()
+    flash("Exchange rates updated.", "success")
+    return redirect(url_for("settings.currencies"))
+
+
+@bp.route("/templates/")
+@login_required
+def templates():
+    rows = PrintTemplate.query.order_by(PrintTemplate.template_type, PrintTemplate.name).all()
+    return render_template("settings/templates.html", title="Print Templates", templates=rows)
+
+
+@bp.route("/templates/create", methods=["GET", "POST"])
+@login_required
+def template_create():
+    template = PrintTemplate(template_type=request.args.get("type") or "sales_invoice", html=DEFAULT_TEMPLATE_HTML)
+    return _template_form(template, "Create Print Template")
+
+
+@bp.route("/templates/<int:id>/edit", methods=["GET", "POST"])
+@login_required
+def template_edit(id):
+    return _template_form(PrintTemplate.query.get_or_404(id), "Edit Print Template")
+
+
+@bp.route("/templates/<int:id>/default", methods=["POST"])
+@login_required
+def template_default(id):
+    template = PrintTemplate.query.get_or_404(id)
+    PrintTemplate.query.filter_by(template_type=template.template_type).update({PrintTemplate.is_default: False})
+    template.is_default = True
+    db.session.commit()
+    flash(f"{template.name} is now default for {template.template_type}.", "success")
+    return redirect(url_for("settings.templates"))
+
+
+@bp.route("/templates/<int:id>/preview", methods=["GET", "POST"])
+@login_required
+def template_preview(id):
+    template = PrintTemplate.query.get_or_404(id)
+    html = request.form.get("html") if request.method == "POST" else template.html
+    rendered = render_template_string(html or "", **_sample_template_context())
+    if request.method == "POST":
+        return jsonify({"html": rendered})
+    return rendered
+
+
+@bp.route("/templates/preview-live", methods=["POST"])
+@login_required
+def template_preview_live():
+    rendered = render_template_string(request.form.get("html") or "", **_sample_template_context())
+    return jsonify({"html": rendered})
+
+
+@bp.route("/scheduled-reports/", methods=["GET", "POST"])
+@login_required
+def scheduled_reports():
+    if request.method == "POST":
+        report = ScheduledReport(
+            name=request.form["name"],
+            report_type=request.form["report_type"],
+            frequency=request.form.get("frequency") or "Daily",
+            day_of_week=request.form.get("day_of_week") or None,
+            day_of_month=request.form.get("day_of_month") or None,
+            time_of_day=request.form.get("time_of_day") or "09:00",
+            recipient_emails=request.form.get("recipient_emails"),
+            format=request.form.get("format") or "Excel",
+            is_active=bool(request.form.get("is_active")),
+            created_by=current_user.id,
+        )
+        db.session.add(report)
+        db.session.commit()
+        flash("Scheduled report saved.", "success")
+        return redirect(url_for("settings.scheduled_reports"))
+    return render_template("settings/scheduled_reports.html", title="Scheduled Reports", reports=ScheduledReport.query.order_by(ScheduledReport.id.desc()).all())
+
+
+@bp.route("/scheduled-reports/<int:id>/run-now", methods=["POST"])
+@login_required
+def scheduled_report_run_now(id):
+    report = ScheduledReport.query.get_or_404(id)
+    ok = send_report_now(report)
+    flash("Report sent." if ok else "Email not configured; report was not sent.", "success" if ok else "warning")
+    return redirect(url_for("settings.scheduled_reports"))
+
+
+@bp.route("/scheduled-reports/run-due", methods=["POST"])
+@login_required
+def scheduled_report_run_due():
+    sent = send_due_reports()
+    flash(f"Sent {len(sent)} due report(s).", "success")
+    return redirect(url_for("settings.scheduled_reports"))
+
+
+def _template_form(template, title):
+    if request.method == "POST":
+        template.name = request.form["name"]
+        template.template_type = request.form["template_type"]
+        template.html = request.form.get("html")
+        template.is_default = bool(request.form.get("is_default"))
+        if template.is_default:
+            PrintTemplate.query.filter_by(template_type=template.template_type).update({PrintTemplate.is_default: False})
+        db.session.add(template)
+        db.session.commit()
+        flash("Print template saved.", "success")
+        return redirect(url_for("settings.templates"))
+    return render_template("settings/template_editor.html", title=title, template=template, template_types=TEMPLATE_TYPES, variables=TEMPLATE_VARIABLES)
+
+
+def _sample_template_context():
+    class Obj:
+        def __init__(self, **kwargs):
+            self.__dict__.update(kwargs)
+
+    company = CompanySetting.query.first() or Obj(company_name="Vyapara ERP", address="Company Address", tax_number="GSTIN")
+    customer = Obj(name="Sample Customer", billing_address="Customer Address")
+    invoice = Obj(invoice_no="INV-SAMPLE", invoice_date="2026-05-21", grand_total=1180, customer=customer)
+    items = [Obj(product=Obj(name="Sample Item", hsn_code="9983"), quantity=2, rate=500, tax_amount=180, line_total=1180)]
+    return {"company": company, "invoice": invoice, "sale": invoice, "items": items}
+
+
+TEMPLATE_TYPES = ["sales_invoice", "purchase_order", "delivery_challan", "quotation", "receipt", "credit_note"]
+TEMPLATE_VARIABLES = ["company.company_name", "company.address", "invoice.invoice_no", "invoice.customer.name", "invoice.invoice_date", "invoice.grand_total", "items"]
+DEFAULT_TEMPLATE_HTML = """<div style="font-family:Arial,sans-serif"><h1>{{ company.company_name }}</h1><h2>Invoice {{ invoice.invoice_no }}</h2><p>{{ invoice.customer.name }}</p><table width="100%" border="1" cellspacing="0" cellpadding="6">{% for item in items %}<tr><td>{{ item.product.name }}</td><td>{{ item.quantity }}</td><td>{{ item.line_total }}</td></tr>{% endfor %}</table><h3>Total {{ invoice.grand_total }}</h3></div>"""

@@ -1,0 +1,4 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="panel"><table class="table datatable"><thead><tr><th>Date</th><th>Party</th><th>Reference</th><th>Section</th><th>Base</th><th>Rate</th><th>TCS</th><th>Status</th></tr></thead><tbody>{% for e in entries %}<tr><td>{{ e.entry_date }}</td><td>{{ e.party_type }} #{{ e.party_id }}</td><td>{{ e.reference_no }}</td><td>{{ e.section.section_code }}</td><td>{{ e.base_amount }}</td><td>{{ e.tds_rate }}%</td><td>{{ e.tds_amount }}</td><td>{{ e.status }}</td></tr>{% endfor %}</tbody></table></div>
+{% endblock %}

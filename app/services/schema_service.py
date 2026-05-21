@@ -9,11 +9,17 @@ SALE_COLUMNS = {
     "issued_at": "DATETIME",
     "cancelled_at": "DATETIME",
     "cancellation_reason": "TEXT",
+    "irn": "VARCHAR(64)",
+    "irn_ack_no": "VARCHAR(64)",
+    "irn_ack_dt": "DATETIME",
+    "qr_code_data": "TEXT",
+    "e_invoice_status": "VARCHAR(20) DEFAULT 'Pending'",
 }
 
 
 def ensure_invoice_schema(app):
     with app.app_context():
+        db.create_all()
         inspector = inspect(db.engine)
         if "sales" not in inspector.get_table_names():
             return

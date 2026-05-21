@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block content %}
+<form class="panel" method="post">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <div class="form-grid">
+    <div><label class="form-label">MO No</label><input class="form-control" name="mo_no" value="{{ order.mo_no }}"></div>
+    <div><label class="form-label">BOM</label><select class="form-select" name="bom_id" required><option value="">Select</option>{% for bom in boms %}<option value="{{ bom.id }}">{{ bom.name }} - {{ bom.product.name }}</option>{% endfor %}</select></div>
+    <div><label class="form-label">Warehouse</label><select class="form-select" name="warehouse_id" required><option value="">Select</option>{% for w in warehouses %}<option value="{{ w.id }}">{{ w.name }}</option>{% endfor %}</select></div>
+    <div><label class="form-label">Planned Qty</label><input class="form-control" type="number" step="0.001" name="planned_qty" value="1" required></div>
+    <div><label class="form-label">Produced Qty</label><input class="form-control" type="number" step="0.001" name="produced_qty" value="1"></div>
+    <div><label class="form-label">Planned Date</label><input class="form-control" type="date" name="planned_date" value="{{ order.planned_date }}"></div>
+  </div>
+  <label class="form-label mt-3">Notes</label><textarea class="form-control" name="notes"></textarea>
+  <div class="sticky-actions"><button class="btn btn-primary">Save Manufacturing Order</button></div>
+</form>
+{% endblock %}

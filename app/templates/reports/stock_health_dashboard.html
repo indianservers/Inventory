@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="row g-3 mb-3">
+  {% for label, count, color in [('Low Stock', low|length, 'danger'), ('Overstock', overstock|length, 'warning'), ('Near Expiry', near_expiry|length, 'info'), ('Dead Stock', dead|length, 'secondary'), ('Negative Stock', negative|length, 'danger')] %}
+  <div class="col-6 col-md"><div class="metric"><div class="text-muted">{{ label }}</div><div class="value text-{{ color }}">{{ count }}</div></div></div>
+  {% endfor %}
+</div>
+{% for title, rows in [('Low Stock', low), ('Overstock', overstock), ('Negative Stock', negative), ('Dead Stock', dead)] %}
+<div class="panel mb-3"><h2 class="h6">{{ title }}</h2><table class="table table-sm"><thead><tr><th>SKU</th><th>Name</th><th>Stock</th><th>Min</th><th>Max</th></tr></thead><tbody>{% for p in rows %}<tr><td>{{ p.sku }}</td><td>{{ p.name }}</td><td>{{ p.current_stock }}</td><td>{{ p.min_stock }}</td><td>{{ p.max_stock }}</td></tr>{% else %}<tr><td colspan="5" class="text-muted">No items</td></tr>{% endfor %}</tbody></table></div>
+{% endfor %}
+<div class="panel"><h2 class="h6">Near Expiry</h2><table class="table table-sm"><thead><tr><th>Product</th><th>Batch</th><th>Expiry</th><th>Qty</th></tr></thead><tbody>{% for b in near_expiry %}<tr><td>{{ b.product.name }}</td><td>{{ b.batch_no }}</td><td>{{ b.expiry_date }}</td><td>{{ b.quantity }}</td></tr>{% else %}<tr><td colspan="4" class="text-muted">No near-expiry stock</td></tr>{% endfor %}</tbody></table></div>
+{% endblock %}

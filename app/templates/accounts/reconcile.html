@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="panel mb-3">
+  <form class="row g-2" method="post" enctype="multipart/form-data" action="{{ url_for('accounts.import_bank_statement', id=bank.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><div class="col"><input class="form-control" type="file" name="statement" accept=".csv,.ofx"></div><div class="col-auto"><button class="btn btn-outline-secondary" name="preview" value="1">Preview</button></div><div class="col-auto"><button class="btn btn-primary">Import</button></div></form>
+  <form class="mt-2" method="post" action="{{ url_for('accounts.auto_match_bank', id=bank.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn btn-success">Auto-Match</button></form>
+</div>
+{% if preview %}<div class="panel mb-3"><h2 class="h6">Import Preview</h2><pre>{{ preview[:5] }}</pre></div>{% endif %}
+<div class="row g-3">
+  <div class="col-lg-6"><div class="panel"><h2 class="h6">Bank Lines</h2><table class="table table-sm"><thead><tr><th>Date</th><th>Description</th><th>Debit</th><th>Credit</th><th>Status</th><th></th></tr></thead><tbody>{% for l in lines %}<tr class="{{ 'table-success' if l.is_reconciled else 'table-warning' }}"><td>{{ l.txn_date }}</td><td>{{ l.description }}</td><td>{{ l.debit }}</td><td>{{ l.credit }}</td><td>{{ l.matched_to_type or 'Unmatched' }}</td><td><form method="post" action="{{ url_for('accounts.create_entry_from_bank', id=bank.id, line_id=l.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn btn-sm btn-outline-primary">Create Entry</button></form></td></tr>{% endfor %}</tbody></table></div></div>
+  <div class="col-lg-6"><div class="panel"><h2 class="h6">Unmatched Payments / Receipts</h2><table class="table table-sm"><thead><tr><th>Type</th><th>Date</th><th>No</th><th>Amount</th></tr></thead><tbody>{% for r in receipts %}<tr><td>Receipt</td><td>{{ r.receipt_date }}</td><td>{{ r.receipt_no }}</td><td>{{ r.amount }}</td></tr>{% endfor %}{% for p in payments %}<tr><td>Payment</td><td>{{ p.voucher_date }}</td><td>{{ p.voucher_no }}</td><td>{{ p.amount }}</td></tr>{% endfor %}</tbody></table></div></div>
+</div>
+{% endblock %}

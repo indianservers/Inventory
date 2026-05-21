@@ -91,4 +91,26 @@ def create_app():
         db.create_all()
         print("Database tables created.")
 
+    @app.cli.group("recurring")
+    def recurring_cli():
+        """Recurring invoice jobs."""
+
+    @recurring_cli.command("run")
+    def recurring_run():
+        from app.services.recurring_service import generate_due_recurring
+
+        generated = generate_due_recurring()
+        print(f"Generated {len(generated)} recurring invoice(s).")
+
+    @app.cli.group("reports")
+    def reports_cli():
+        """Scheduled report jobs."""
+
+    @reports_cli.command("send-due")
+    def reports_send_due():
+        from app.services.report_mailer import send_due_reports
+
+        sent = send_due_reports()
+        print(f"Sent {len(sent)} scheduled report(s).")
+
     return app

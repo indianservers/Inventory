@@ -66,6 +66,19 @@ Default login:
 
 The deepest completed flows are sales, purchases, inventory ledger, weighted-average costing, customer/supplier ledgers, balanced journals, receipts, payments, and the dashboard/report surface. Return, quotation, proforma, challan, restore, WhatsApp/email, and advanced PDF templates have database models and navigation placeholders ready for extension.
 
+## Phase 3 Upgrades
+
+- Recurring invoices with run-now, due-run route, and `flask recurring run` scheduler command.
+- Multi-currency master data, live exchange-rate refresh, and INR snapshots on sales/purchases.
+- BOM and manufacturing orders with component issue and finished-good receipt stock ledger entries.
+- ABC analysis, dead stock, stock health, and sales velocity reports with Excel exports.
+- Mobile PWA install support, service worker, offline fallback, app icons, and mobile bottom navigation.
+- Print template editor with Classic, Modern, and Thermal invoice template seeds.
+- Scheduled report emails via SMTP and `flask reports send-due`.
+- TDS/TCS ledgers, default TDS sections, supplier TDS flags, and purchase-side TDS deduction.
+
+For daily automation, call `flask recurring run` and `flask reports send-due` from Windows Task Scheduler or cron once per day. Configure `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, and `SMTP_FROM` before enabling scheduled email delivery.
+
 ## Tests
 
 ```powershell

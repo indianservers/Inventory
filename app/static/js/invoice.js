@@ -1,4 +1,5 @@
 let invoiceProducts = [];
+let activePriceList = {};
 
 function optionLabel(product) {
   return `${product.sku} - ${product.name}${product.current_stock <= 0 ? " (Out)" : ""}`;
@@ -43,6 +44,12 @@ async function initInvoiceForm(mode) {
   const holder = document.querySelector("#items");
   if (!holder) return;
   invoiceProducts = await fetch("/api/products").then((r) => r.json());
+  document.querySelector('[name="customer_id"]')?.addEventListener("change", loadCustomerPriceList);
+  document.querySelector(".currency-select")?.addEventListener("change", (event) => {
+    const rate = event.target.selectedOptions[0]?.dataset.rate || 1;
+    const input = document.querySelector('[name="exchange_rate_snapshot"]');
+    if (input) input.value = rate;
+  });
 
   if (document.querySelector(".invoice-pos-shell")) {
     initPosInvoiceForm(mode, holder);
@@ -189,13 +196,29 @@ function syncRowFromSelect(row, mode, applyPricing = true) {
   const select = row.querySelector(".product-select");
   const opt = select.selectedOptions[0];
   const product = invoiceProducts.find((item) => String(item.id) === String(select.value));
-  const price = mode === "purchase" ? opt?.dataset.cost : opt?.dataset.price;
+  const priceListPrice = activePriceList[String(select.value)];
+  const price = mode === "purchase" ? opt?.dataset.cost : (priceListPrice ?? opt?.dataset.price);
 
   if (applyPricing && price !== undefined) row.querySelector(".rate").value = price || 0;
   if (applyPricing && opt?.dataset.tax !== undefined) row.querySelector(".tax").value = opt.dataset.tax || 0;
   row.querySelector(".stock-hint").textContent = opt?.value ? `Available: ${opt.dataset.stock || 0}` : "";
   const title = row.querySelector(".cart-row-title");
   if (title) title.textContent = product ? product.name : "Select product";
+  let label = row.querySelector(".price-list-label");
+  if (!label && row.querySelector(".rate")) {
+    label = document.createElement("span");
+    label.className = "price-list-label small text-success";
+    row.querySelector(".rate").insertAdjacentElement("afterend", label);
+  }
+  if (label) label.textContent = priceListPrice ? "(Price List)" : "";
+}
+
+async function loadCustomerPriceList(event) {
+  const id = event.target.value;
+  activePriceList = {};
+  if (!id) return;
+  const data = await fetch(`/api/customer/${id}/price-list`).then((r) => r.json());
+  activePriceList = data.items || {};
 }
 
 function filterProductTiles() {

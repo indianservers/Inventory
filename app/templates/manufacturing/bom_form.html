@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block content %}
+<form class="panel" method="post">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <div class="form-grid">
+    <div><label class="form-label">Name</label><input class="form-control" name="name" value="{{ bom.name or '' }}" required></div>
+    <div><label class="form-label">Finished Good</label><select class="form-select" name="product_id" required><option value="">Select</option>{% for p in products %}<option value="{{ p.id }}" {% if bom.product_id == p.id %}selected{% endif %}>{{ p.sku }} - {{ p.name }}</option>{% endfor %}</select></div>
+    <div><label class="form-label">Yield Qty</label><input class="form-control" type="number" step="0.001" name="yield_qty" value="{{ bom.yield_qty or 1 }}"></div>
+    <div><label class="form-label">Version</label><input class="form-control" name="version" value="{{ bom.version or '1' }}"></div>
+    <label class="form-check mt-4"><input class="form-check-input" type="checkbox" name="is_active" {% if bom.is_active or not bom.id %}checked{% endif %}> Active</label>
+  </div>
+  <hr><div class="d-flex justify-content-between"><h2 class="h6">Components</h2><button id="add-component" class="btn btn-sm btn-outline-primary" type="button"><i class="bi bi-plus-lg"></i></button></div>
+  <div id="components">{% for item in bom.items %}
+    <div class="item-row mb-2"><select class="form-select" name="component_id[]" required><option value="">Component</option>{% for p in products %}<option value="{{ p.id }}" {% if item.component_id == p.id %}selected{% endif %}>{{ p.sku }} - {{ p.name }}</option>{% endfor %}</select><input class="form-control" name="quantity[]" type="number" step="0.001" value="{{ item.quantity }}"><select class="form-select" name="unit_id[]"><option value="">Unit</option>{% for u in units %}<option value="{{ u.id }}" {% if item.unit_id == u.id %}selected{% endif %}>{{ u.short_name }}</option>{% endfor %}</select><input class="form-control" name="waste_pct[]" type="number" step="0.01" value="{{ item.waste_pct }}"><button class="btn btn-outline-danger remove-row" type="button"><i class="bi bi-trash"></i></button></div>
+  {% endfor %}</div>
+  <label class="form-label mt-3">Notes</label><textarea class="form-control" name="notes">{{ bom.notes or '' }}</textarea>
+  <div class="sticky-actions"><button class="btn btn-primary">Save BOM</button></div>
+</form>
+{% endblock %}
+{% block scripts %}<script>
+const componentRow = () => `<div class="item-row mb-2"><select class="form-select" name="component_id[]" required><option value="">Component</option>{% for p in products %}<option value="{{ p.id }}">{{ p.sku }} - {{ p.name }}</option>{% endfor %}</select><input class="form-control" name="quantity[]" type="number" step="0.001" value="1"><select class="form-select" name="unit_id[]"><option value="">Unit</option>{% for u in units %}<option value="{{ u.id }}">{{ u.short_name }}</option>{% endfor %}</select><input class="form-control" name="waste_pct[]" type="number" step="0.01" value="0"><button class="btn btn-outline-danger remove-row" type="button"><i class="bi bi-trash"></i></button></div>`;
+document.querySelector("#add-component").addEventListener("click",()=>components.insertAdjacentHTML("beforeend", componentRow()));
+document.querySelector("#components").addEventListener("click",e=>{if(e.target.closest(".remove-row")) e.target.closest(".item-row").remove()});
+if(!components.children.length) document.querySelector("#add-component").click();
+</script>{% endblock %}

@@ -23,6 +23,7 @@ class Customer(db.Model):
     opening_balance = db.Column(db.Numeric(12, 2), default=0)
     current_balance = db.Column(db.Numeric(12, 2), default=0)
     payment_terms = db.Column(db.Integer, default=30)
+    price_list_id = db.Column(db.Integer, db.ForeignKey('price_lists.id'), nullable=True)
     status = db.Column(db.Boolean, default=True)
     created_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
@@ -30,6 +31,7 @@ class Customer(db.Model):
     sales = db.relationship('Sale', backref='customer', lazy='dynamic')
     ledger_entries = db.relationship('CustomerLedger', backref='customer', lazy='dynamic')
     payments_received = db.relationship('PaymentReceived', backref='customer', lazy='dynamic')
+    price_list = db.relationship('PriceList', backref='customers')
 
     @property
     def outstanding(self):
@@ -63,6 +65,8 @@ class Supplier(db.Model):
     opening_balance = db.Column(db.Numeric(12, 2), default=0)
     current_balance = db.Column(db.Numeric(12, 2), default=0)
     payment_terms = db.Column(db.Integer, default=30)
+    tds_applicable = db.Column(db.Boolean, default=False)
+    tds_section_id = db.Column(db.Integer, db.ForeignKey('tds_sections.id'), nullable=True)
     status = db.Column(db.Boolean, default=True)
     created_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
@@ -70,6 +74,7 @@ class Supplier(db.Model):
     purchases = db.relationship('Purchase', backref='supplier', lazy='dynamic')
     ledger_entries = db.relationship('SupplierLedger', backref='supplier', lazy='dynamic')
     payments_made = db.relationship('PaymentMade', backref='supplier', lazy='dynamic')
+    tds_section = db.relationship('TDSSection', backref='suppliers')
 
     @property
     def outstanding(self):

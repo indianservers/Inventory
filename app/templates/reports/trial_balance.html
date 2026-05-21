@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block content %}
 <div class="panel">
-  <button class="btn btn-outline-secondary mb-3" onclick="window.print()"><i class="bi bi-printer"></i> Print</button>
+  <div class="d-flex flex-wrap gap-2 mb-3"><button class="btn btn-outline-secondary" onclick="window.print()"><i class="bi bi-printer"></i> Print</button><a class="btn btn-outline-success" href="{{ url_for('reports.trial_balance', export='xlsx') }}"><i class="bi bi-file-earmark-excel"></i> Export Excel</a></div>
   <table class="table datatable align-middle">
     <thead><tr><th>Code</th><th>Account</th><th>Group</th><th>Type</th><th>Debit</th><th>Credit</th></tr></thead>
     <tbody>{% for row in rows %}<tr><td>{{ row.code }}</td><td>{{ row.name }}</td><td>{{ row.group }}</td><td>{{ row.type }}</td><td>{{ "%.2f"|format(row.debit) }}</td><td>{{ "%.2f"|format(row.credit) }}</td></tr>{% endfor %}</tbody>

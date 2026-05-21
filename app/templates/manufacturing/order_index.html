@@ -1,0 +1,5 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="d-flex justify-content-end mb-3"><a class="btn btn-primary" href="{{ url_for('manufacturing.order_create') }}">Create MO</a></div>
+<div class="panel"><table class="table datatable"><thead><tr><th>MO No</th><th>BOM</th><th>Warehouse</th><th>Planned</th><th>Produced</th><th>Status</th><th></th></tr></thead><tbody>{% for order in orders %}<tr><td>{{ order.mo_no }}</td><td>{{ order.bom.name }}</td><td>{{ order.warehouse.name }}</td><td>{{ order.planned_qty }}</td><td>{{ order.produced_qty }}</td><td>{{ order.status }}</td><td class="text-end">{% if order.status != 'Completed' %}<form method="post" action="{{ url_for('manufacturing.order_complete', id=order.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="produced_qty" value="{{ order.produced_qty or order.planned_qty }}"><button class="btn btn-sm btn-success">Complete</button></form>{% endif %}</td></tr>{% endfor %}</tbody></table></div>
+{% endblock %}

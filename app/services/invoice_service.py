@@ -3,7 +3,7 @@ from datetime import date, datetime
 from flask import abort
 
 from app.extensions import db
-from app.models import Customer, PaymentReceived, Product, Sale, SaleItem
+from app.models import Currency, Customer, PaymentReceived, Product, Sale, SaleItem
 from app.services.accounting_service import post_customer_receipt, post_sale, reverse_sale
 from app.services.numbering_service import next_number
 from app.services.stock_service import apply_sale_item, reverse_sale_item
@@ -70,12 +70,23 @@ def create_or_update_invoice(sale, form, items, user_id):
     if not customer:
         abort(400, "Customer does not exist.")
     totals = calculate_document(items, shipping=form.get("shipping_charges"), other=form.get("other_charges"), round_off=form.get("round_off"), paid=0)
+    currency = Currency.query.get(form.get("currency_id")) if form.get("currency_id") else Currency.query.filter_by(is_base=True).first()
+    exchange_rate = money(form.get("exchange_rate_snapshot") or (currency.exchange_rate if currency else 1) or 1)
+    original_total = totals["grand_total"]
+    if exchange_rate != 1:
+        totals = {key: money(value * exchange_rate) if key not in ["payment_status"] else value for key, value in totals.items()}
+        for item in items:
+            for key in ["rate", "gross", "discount_amount", "tax_amount", "line_total"]:
+                item[key] = money(item[key] * exchange_rate)
     sale.invoice_no = form.get("invoice_no") or sale.invoice_no or next_number("sales")
     sale.invoice_date = invoice_date
     sale.due_date = due_date
     sale.customer_id = form["customer_id"]
     sale.warehouse_id = form["warehouse_id"]
     sale.sale_type = form.get("sale_type") or "Credit"
+    sale.currency_id = currency.id if currency else None
+    sale.exchange_rate_snapshot = exchange_rate
+    sale.original_currency_total = original_total
     sale.notes = form.get("notes")
     sale.terms = form.get("terms")
     sale.status = "Draft"

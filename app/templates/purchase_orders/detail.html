@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="row g-3">
+  <div class="col-lg-8"><div class="panel">
+    <h2 class="h5">{{ po.po_no }}</h2>
+    <p class="text-muted">{{ po.po_date }} | {{ po.supplier.name }} | {{ po.status }}</p>
+    <table class="table align-middle"><thead><tr><th>Product</th><th>Ordered</th><th>Received</th><th>Rate</th><th>Total</th></tr></thead><tbody>{% for item in po.items %}<tr><td>{{ item.product.name }}</td><td>{{ item.quantity }}</td><td>{{ item.received_qty }}</td><td>{{ item.rate }}</td><td>{{ item.line_total }}</td></tr>{% endfor %}</tbody></table>
+    <div class="text-end"><strong>Total: {{ po.grand_total }}</strong></div>
+  </div></div>
+  <div class="col-lg-4"><div class="panel">
+    <h2 class="h6">Actions</h2>
+    <div class="d-grid gap-2">
+      <form method="post" action="{{ url_for('purchase_orders.send', id=po.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn btn-outline-primary w-100">Mark Sent</button></form>
+      <a class="btn btn-success" href="{{ url_for('purchase_orders.grn_from_po', id=po.id) }}">Create GRN</a>
+      <a class="btn btn-outline-secondary" href="{{ url_for('purchase_orders.print_po', id=po.id) }}">Print PO</a>
+      <form method="post" action="{{ url_for('purchase_orders.cancel', id=po.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn btn-outline-danger w-100">Cancel PO</button></form>
+    </div>
+  </div></div>
+</div>
+{% endblock %}

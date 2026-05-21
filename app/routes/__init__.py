@@ -5,6 +5,12 @@ def register_blueprints(app):
     from app.routes.party_routes import bp as party_bp
     from app.routes.product_routes import bp as product_bp
     from app.routes.purchase_routes import bp as purchase_bp
+    from app.routes.purchase_order_routes import bp as purchase_order_bp
+    from app.routes.pos_routes import bp as pos_bp
+    from app.routes.price_routes import bp as price_bp
+    from app.routes.note_routes import bp as note_bp
+    from app.routes.recurring_routes import bp as recurring_bp
+    from app.routes.manufacturing_routes import bp as manufacturing_bp
     from app.routes.sales_routes import bp as sales_bp
     from app.routes.invoice_routes import bp as invoice_bp
     from app.routes.stock_routes import bp as stock_bp
@@ -21,6 +27,12 @@ def register_blueprints(app):
         party_bp,
         product_bp,
         purchase_bp,
+        purchase_order_bp,
+        pos_bp,
+        price_bp,
+        note_bp,
+        recurring_bp,
+        manufacturing_bp,
         sales_bp,
         invoice_bp,
         stock_bp,

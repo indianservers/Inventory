@@ -6,13 +6,14 @@
     {% if create_endpoint %}<a class="btn btn-primary" href="{{ url_for(create_endpoint) }}"><i class="bi bi-plus-lg"></i> Create</a>{% endif %}
   </div>
   <table class="table datatable align-middle">
-    <thead><tr><th>No</th><th>Date</th><th>Customer</th><th>Total</th><th>Status</th></tr></thead>
+    <thead><tr><th>No</th><th>Date</th><th>Customer</th><th>Total</th><th>Status</th><th></th></tr></thead>
     <tbody>{% for i in items %}<tr>
       <td>{{ i|attr(no_field) }}</td>
       <td>{{ i.quotation_date if i.quotation_date is defined else i.proforma_date if i.proforma_date is defined else i.challan_date if i.challan_date is defined else i.created_at.date() }}</td>
       <td>{{ i.quotation_customer.name if i.quotation_customer is defined and i.quotation_customer else i.proforma_customer.name if i.proforma_customer is defined and i.proforma_customer else i.challan_customer.name if i.challan_customer is defined and i.challan_customer else '' }}</td>
       <td>{{ i.grand_total if i.grand_total is defined else '' }}</td>
       <td>{{ i.status }}</td>
+      <td class="table-actions">{% if no_field == 'quotation_no' and i.status != 'Converted' %}<form method="post" action="{{ url_for('sales.quotation_convert', id=i.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn btn-sm btn-outline-primary">Convert to Invoice</button></form>{% elif no_field == 'proforma_no' and i.status != 'Converted' %}<form method="post" action="{{ url_for('sales.proforma_convert', id=i.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn btn-sm btn-outline-primary">Convert to Invoice</button></form>{% endif %}</td>
     </tr>{% endfor %}</tbody>
   </table>
 </div>

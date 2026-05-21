@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="panel">
+  <table class="table datatable">
+    <thead><tr><th>Invoice</th><th>Date</th><th>Total</th><th>Status</th></tr></thead>
+    <tbody>{% for sale in sales %}<tr><td><a href="{{ url_for('invoices.detail', id=sale.id) }}">{{ sale.invoice_no }}</a></td><td>{{ sale.invoice_date }}</td><td>{{ sale.grand_total }}</td><td>{{ sale.display_status }}</td></tr>{% endfor %}</tbody>
+  </table>
+</div>
+{% endblock %}

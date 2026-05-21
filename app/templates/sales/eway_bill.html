@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block content %}
+<form class="panel" method="post">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <div><h2 class="h5 mb-1">Generate E-Way Bill</h2><div class="text-muted">{{ sale.invoice_no }} | {{ sale.customer.name }} | {{ sale.grand_total }}</div></div>
+    <a class="btn btn-outline-secondary" href="{{ url_for('sales.index') }}">Back</a>
+  </div>
+  <div class="form-grid">
+    <div><label class="form-label">Vehicle No</label><input class="form-control" name="vehicle_no" required></div>
+    <div><label class="form-label">Transporter Name</label><input class="form-control" name="transporter_name"></div>
+    <div><label class="form-label">Distance KM</label><input class="form-control" name="distance_km" type="number" min="0" value="0"></div>
+    <div><label class="form-label">Transporter ID</label><input class="form-control" name="transporter_id"></div>
+    <div><label class="form-label">Supply Type</label><input class="form-control" name="supply_type" value="Outward"></div>
+    <div><label class="form-label">Sub Type</label><input class="form-control" name="sub_type" value="Supply"></div>
+  </div>
+  <button class="btn btn-primary mt-3">Generate E-Way Bill</button>
+</form>
+{% endblock %}

@@ -1,0 +1,5 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="d-flex justify-content-end mb-3"><a class="btn btn-primary" href="{{ url_for('manufacturing.bom_create') }}">Create BOM</a></div>
+<div class="panel"><table class="table datatable"><thead><tr><th>Name</th><th>Finished Good</th><th>Yield</th><th>Version</th><th>Status</th><th></th></tr></thead><tbody>{% for bom in boms %}<tr><td>{{ bom.name }}</td><td>{{ bom.product.name }}</td><td>{{ bom.yield_qty }}</td><td>{{ bom.version }}</td><td>{{ 'Active' if bom.is_active else 'Inactive' }}</td><td class="text-end"><a class="btn btn-sm btn-outline-primary" href="{{ url_for('manufacturing.bom_edit', id=bom.id) }}">Edit</a></td></tr>{% endfor %}</tbody></table></div>
+{% endblock %}

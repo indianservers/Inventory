@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block content %}
+<form class="panel" method="post">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <div class="row g-3 mb-3">
+    <div class="col-md-5"><input class="form-control" name="name" placeholder="Template name" value="{{ template.name or '' }}" required></div>
+    <div class="col-md-4"><select class="form-select" name="template_type">{% for t in template_types %}<option value="{{ t }}" {% if template.template_type == t %}selected{% endif %}>{{ t.replace('_',' ')|title }}</option>{% endfor %}</select></div>
+    <div class="col-md-3"><label class="form-check mt-2"><input class="form-check-input" type="checkbox" name="is_default" {% if template.is_default %}checked{% endif %}> Default</label></div>
+  </div>
+  <div class="row g-3">
+    <div class="col-lg-5">
+      <textarea id="template-html" name="html">{{ template.html or '' }}</textarea>
+      <div class="mt-3 small"><strong>Variables:</strong> {% for v in variables %}<code class="me-2">{{ '{{ ' ~ v ~ ' }}' }}</code>{% endfor %}</div>
+    </div>
+    <div class="col-lg-7"><iframe id="preview-frame" class="w-100 border rounded bg-white" style="height:640px"></iframe></div>
+  </div>
+  <div class="sticky-actions"><button class="btn btn-primary">Save Template</button></div>
+</form>
+{% endblock %}
+{% block scripts %}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/codemirror@5.65.16/lib/codemirror.css">
+<script src="https://cdn.jsdelivr.net/npm/codemirror@5.65.16/lib/codemirror.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/codemirror@5.65.16/mode/xml/xml.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/codemirror@5.65.16/mode/htmlmixed/htmlmixed.js"></script>
+<script>
+const editor = CodeMirror.fromTextArea(document.querySelector("#template-html"), {mode:"htmlmixed", lineNumbers:true});
+const frame = document.querySelector("#preview-frame");
+let timer;
+async function updatePreview(){
+  const form = new FormData(); form.append("html", editor.getValue()); form.append("csrf_token", document.querySelector("[name=csrf_token]").value);
+  const res = await fetch("{{ url_for('settings.template_preview', id=template.id) if template.id else url_for('settings.template_preview_live') }}", {method:"POST", body:form}).catch(()=>null);
+  if (!res || !res.ok) { frame.srcdoc = editor.getValue(); return; }
+  const data = await res.json(); frame.srcdoc = data.html;
+}
+editor.on("change",()=>{clearTimeout(timer); timer=setTimeout(updatePreview,500);});
+updatePreview();
+</script>
+{% endblock %}

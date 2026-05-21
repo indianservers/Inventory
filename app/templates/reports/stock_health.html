@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block content %}
 <div class="panel">
-  <button class="btn btn-outline-secondary mb-3" onclick="window.print()"><i class="bi bi-printer"></i> Print</button>
+  <div class="d-flex flex-wrap gap-2 mb-3"><button class="btn btn-outline-secondary" onclick="window.print()"><i class="bi bi-printer"></i> Print</button><a class="btn btn-outline-success" href="{{ request.path }}?export=xlsx"><i class="bi bi-file-earmark-excel"></i> Export Excel</a></div>
   <table class="table datatable align-middle">
     <thead><tr><th>SKU</th><th>Product</th><th>Warehouse</th><th>Rack/Bin</th><th>Current</th><th>Minimum</th><th>Reorder</th><th>Suggested Qty</th></tr></thead>
     <tbody>{% for p in products %}<tr>

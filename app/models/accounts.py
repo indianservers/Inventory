@@ -222,3 +222,68 @@ class Expense(db.Model):
 
     def __repr__(self):
         return f'<Expense {self.expense_no}>'
+
+
+class BankStatementLine(db.Model):
+    __tablename__ = 'bank_statement_lines'
+    id = db.Column(db.Integer, primary_key=True)
+    bank_account_id = db.Column(db.Integer, db.ForeignKey('bank_accounts.id'), nullable=False)
+    txn_date = db.Column(db.Date, nullable=False)
+    description = db.Column(db.Text)
+    debit = db.Column(db.Numeric(12, 2), default=0)
+    credit = db.Column(db.Numeric(12, 2), default=0)
+    balance = db.Column(db.Numeric(12, 2), default=0)
+    reference_no = db.Column(db.String(80))
+    matched_to_type = db.Column(db.String(30))
+    matched_to_id = db.Column(db.Integer)
+    is_reconciled = db.Column(db.Boolean, default=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    bank_account = db.relationship('BankAccount', backref='statement_lines')
+
+
+class TDSSection(db.Model):
+    __tablename__ = 'tds_sections'
+    id = db.Column(db.Integer, primary_key=True)
+    section_code = db.Column(db.String(20), unique=True, nullable=False)
+    description = db.Column(db.String(255))
+    default_rate = db.Column(db.Numeric(5, 2), default=0)
+    threshold_amount = db.Column(db.Numeric(12, 2), default=0)
+    is_active = db.Column(db.Boolean, default=True)
+
+
+class TDSEntry(db.Model):
+    __tablename__ = 'tds_entries'
+    id = db.Column(db.Integer, primary_key=True)
+    entry_date = db.Column(db.Date, nullable=False)
+    party_type = db.Column(db.String(20), nullable=False)
+    party_id = db.Column(db.Integer, nullable=False)
+    reference_type = db.Column(db.String(30))
+    reference_id = db.Column(db.Integer)
+    reference_no = db.Column(db.String(50))
+    section_id = db.Column(db.Integer, db.ForeignKey('tds_sections.id'), nullable=False)
+    base_amount = db.Column(db.Numeric(12, 2), default=0)
+    tds_rate = db.Column(db.Numeric(5, 2), default=0)
+    tds_amount = db.Column(db.Numeric(12, 2), default=0)
+    status = db.Column(db.String(20), default='Pending')
+    created_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    section = db.relationship('TDSSection', backref='tds_entries')
+
+
+class TCSEntry(db.Model):
+    __tablename__ = 'tcs_entries'
+    id = db.Column(db.Integer, primary_key=True)
+    entry_date = db.Column(db.Date, nullable=False)
+    party_type = db.Column(db.String(20), nullable=False)
+    party_id = db.Column(db.Integer, nullable=False)
+    reference_type = db.Column(db.String(30))
+    reference_id = db.Column(db.Integer)
+    reference_no = db.Column(db.String(50))
+    section_id = db.Column(db.Integer, db.ForeignKey('tds_sections.id'), nullable=False)
+    base_amount = db.Column(db.Numeric(12, 2), default=0)
+    tds_rate = db.Column(db.Numeric(5, 2), default=0)
+    tds_amount = db.Column(db.Numeric(12, 2), default=0)
+    status = db.Column(db.String(20), default='Pending')
+    created_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    section = db.relationship('TDSSection', backref='tcs_entries')

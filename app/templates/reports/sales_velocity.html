@@ -1,0 +1,7 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="panel">
+  <div class="d-flex flex-wrap gap-2 mb-3"><button class="btn btn-outline-secondary" onclick="window.print()">Print</button><a class="btn btn-outline-success" href="{{ url_for('reports.sales_velocity', export='xlsx') }}">Export Excel</a></div>
+  <table class="table datatable"><thead><tr><th>SKU</th><th>Name</th><th>Daily Avg</th><th>Weekly Avg</th><th>Monthly Avg</th><th>Days of Stock</th></tr></thead><tbody>{% for r in rows %}<tr class="{% if r.days_left is not none and r.days_left < 7 %}table-danger{% elif r.days_left is not none and r.days_left < 30 %}table-warning{% endif %}"><td>{{ r.product.sku }}</td><td>{{ r.product.name }}</td><td>{{ "%.2f"|format(r.daily) }}</td><td>{{ "%.2f"|format(r.weekly) }}</td><td>{{ "%.2f"|format(r.monthly) }}</td><td>{{ "%.1f"|format(r.days_left) if r.days_left is not none else 'No sales' }}</td></tr>{% endfor %}</tbody></table>
+</div>
+{% endblock %}

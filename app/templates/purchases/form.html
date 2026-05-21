@@ -7,6 +7,8 @@
     <div><label class="form-label">Date</label><input class="form-control" type="date" name="purchase_date" value="{{ today }}" required></div>
     <div><label class="form-label">Supplier</label><select class="form-select" name="supplier_id" required><option value="">Select</option>{% for x in suppliers %}<option value="{{ x.id }}">{{ x.name }}</option>{% endfor %}</select></div>
     <div><label class="form-label">Warehouse</label><select class="form-select" name="warehouse_id" required><option value="">Select</option>{% for x in warehouses %}<option value="{{ x.id }}">{{ x.name }}</option>{% endfor %}</select></div>
+    <div><label class="form-label">Currency</label><select class="form-select currency-select" name="currency_id"><option value="">INR</option>{% for c in currencies or [] %}<option value="{{ c.id }}" data-rate="{{ c.exchange_rate }}">{{ c.code }} - {{ c.name }}</option>{% endfor %}</select></div>
+    <div><label class="form-label">Exchange Rate</label><input class="form-control" name="exchange_rate_snapshot" type="number" step="0.000001" value="1"></div>
     <div><label class="form-label">Supplier Invoice No</label><input class="form-control" name="supplier_invoice_no"></div>
     <div><label class="form-label">Supplier Invoice Date</label><input class="form-control" type="date" name="supplier_invoice_date"></div>
   </div>

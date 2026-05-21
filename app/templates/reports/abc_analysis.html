@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="panel mb-3">
+  <div class="d-flex flex-wrap gap-2 mb-3"><button class="btn btn-outline-secondary" onclick="window.print()">Print</button><a class="btn btn-outline-success" href="{{ url_for('reports.abc_analysis', export='xlsx') }}">Export Excel</a></div>
+  <canvas id="abcChart" height="110"></canvas>
+</div>
+<div class="panel">
+  <table class="table datatable"><thead><tr><th>SKU</th><th>Name</th><th>Revenue</th><th>Revenue %</th><th>Cumulative %</th><th>Grade</th></tr></thead><tbody>{% for r in rows %}<tr><td>{{ r.sku }}</td><td>{{ r.name }}</td><td>{{ "%.2f"|format(r.revenue) }}</td><td>{{ "%.2f"|format(r.pct) }}</td><td>{{ "%.2f"|format(r.cumulative) }}</td><td><span class="badge text-bg-{{ 'success' if r.grade == 'A' else ('warning' if r.grade == 'B' else 'danger') }}">{{ r.grade }}</span></td></tr>{% endfor %}</tbody></table>
+</div>
+{% endblock %}
+{% block scripts %}<script>
+const abcRows={{ rows|tojson }};
+new Chart(document.getElementById("abcChart"),{data:{labels:abcRows.map(r=>r.sku),datasets:[{type:"bar",label:"Revenue",data:abcRows.map(r=>r.revenue),backgroundColor:"#2563eb"},{type:"line",label:"Cumulative %",data:abcRows.map(r=>r.cumulative),borderColor:"#f59e0b",yAxisID:"pct"}]},options:{scales:{pct:{position:"right",min:0,max:100}}}});
+</script>{% endblock %}

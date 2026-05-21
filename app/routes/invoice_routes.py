@@ -1,10 +1,17 @@
+import hmac
+import os
 from datetime import date, timedelta
+from hashlib import sha256
 
-from flask import Blueprint, flash, jsonify, redirect, render_template, request, send_file, url_for
+try:
+    import razorpay
+except ImportError:  # pragma: no cover - dependency is declared for deployments
+    razorpay = None
+from flask import Blueprint, flash, jsonify, redirect, render_template, render_template_string, request, send_file, url_for
 from flask_login import current_user, login_required
 
 from app.extensions import db
-from app.models import Customer, PaymentReceived, Product, Sale, Warehouse
+from app.models import Currency, Customer, PaymentReceived, PrintTemplate, Product, Sale, Warehouse
 from app.services.document_service import hsn_summary
 from app.services.invoice_service import cancel_invoice, create_or_update_invoice, issue_invoice, line_totals, record_invoice_payment
 from app.services.numbering_service import next_number
@@ -59,7 +66,7 @@ def create():
         except Exception as exc:
             db.session.rollback()
             flash(str(exc), "danger")
-    return render_template("invoices/form.html", title="Create Invoice", invoice=sale, customers=Customer.query.order_by(Customer.name).all(), warehouses=Warehouse.query.order_by(Warehouse.name).all(), products=Product.query.filter_by(is_active=True).order_by(Product.name).all(), form_action=url_for("invoices.create"))
+    return render_template("invoices/form.html", title="Create Invoice", invoice=sale, customers=Customer.query.order_by(Customer.name).all(), warehouses=Warehouse.query.order_by(Warehouse.name).all(), products=Product.query.filter_by(is_active=True).order_by(Product.name).all(), currencies=Currency.query.order_by(Currency.code).all(), form_action=url_for("invoices.create"))
 
 
 @bp.route("/<int:id>")
@@ -89,7 +96,7 @@ def edit(id):
         except Exception as exc:
             db.session.rollback()
             flash(str(exc), "danger")
-    return render_template("invoices/form.html", title=f"Edit {invoice.invoice_no}", invoice=invoice, customers=Customer.query.order_by(Customer.name).all(), warehouses=Warehouse.query.order_by(Warehouse.name).all(), products=Product.query.filter_by(is_active=True).order_by(Product.name).all(), form_action=url_for("invoices.edit", id=invoice.id))
+    return render_template("invoices/form.html", title=f"Edit {invoice.invoice_no}", invoice=invoice, customers=Customer.query.order_by(Customer.name).all(), warehouses=Warehouse.query.order_by(Warehouse.name).all(), products=Product.query.filter_by(is_active=True).order_by(Product.name).all(), currencies=Currency.query.order_by(Currency.code).all(), form_action=url_for("invoices.edit", id=invoice.id))
 
 
 @bp.route("/<int:id>/issue", methods=["POST"])
@@ -139,6 +146,9 @@ def cancel(id):
 @login_required
 def print_invoice(id):
     invoice = Sale.query.get_or_404(id)
+    template = PrintTemplate.query.filter_by(template_type="sales_invoice", is_default=True).first()
+    if template and template.html:
+        return render_template_string(template.html, title=f"Invoice {invoice.invoice_no}", invoice=invoice, sale=invoice, items=invoice.items, hsn_rows=hsn_summary(invoice))
     return render_template("sales/print.html", title=f"Invoice {invoice.invoice_no}", sale=invoice, hsn_rows=hsn_summary(invoice))
 
 
@@ -167,3 +177,43 @@ def api_index():
 def api_detail(id):
     invoice = Sale.query.get_or_404(id)
     return jsonify({"id": invoice.id, "invoice_no": invoice.invoice_no, "status": invoice.display_status, "customer": {"id": invoice.customer.id, "name": invoice.customer.name, "outstanding": invoice.customer.outstanding}, "subtotal": float(invoice.subtotal or 0), "discount_total": float(invoice.discount_total or 0), "tax_total": float(invoice.tax_total or 0), "grand_total": float(invoice.grand_total or 0), "paid": float(invoice.paid_amount or 0), "balance": float(invoice.balance_amount or 0), "items": [{"product_id": item.product_id, "product": item.product.name, "quantity": float(item.quantity), "rate": float(item.rate), "tax_rate": float(item.tax_rate or 0), "line_total": float(item.line_total or 0)} for item in invoice.items]})
+
+
+@bp.route("/<int:id>/pay")
+def pay(id):
+    invoice = Sale.query.get_or_404(id)
+    key_id = os.environ.get("RAZORPAY_KEY_ID")
+    return render_template("invoices/pay.html", title=f"Pay {invoice.invoice_no}", invoice=invoice, key_id=key_id)
+
+
+@bp.route("/<int:id>/create-order", methods=["POST"])
+def create_order(id):
+    invoice = Sale.query.get_or_404(id)
+    key_id = os.environ.get("RAZORPAY_KEY_ID")
+    key_secret = os.environ.get("RAZORPAY_KEY_SECRET")
+    if not key_id or not key_secret or not razorpay:
+        return jsonify({"error": "Razorpay is not configured"}), 400
+    amount = int(round(float(invoice.balance_amount or invoice.grand_total or 0) * 100))
+    client = razorpay.Client(auth=(key_id, key_secret))
+    order = client.order.create({"amount": amount, "currency": "INR", "receipt": invoice.invoice_no, "notes": {"customer": invoice.customer.name, "invoice": invoice.invoice_no}})
+    return jsonify({"order_id": order["id"], "amount": amount, "currency": "INR", "key_id": key_id})
+
+
+@bp.route("/<int:id>/payment-callback", methods=["POST"])
+def payment_callback(id):
+    invoice = Sale.query.get_or_404(id)
+    key_secret = os.environ.get("RAZORPAY_KEY_SECRET", "")
+    order_id = request.form.get("razorpay_order_id", "")
+    payment_id = request.form.get("razorpay_payment_id", "")
+    signature = request.form.get("razorpay_signature", "")
+    expected = hmac.new(key_secret.encode(), f"{order_id}|{payment_id}".encode(), sha256).hexdigest()
+    if not key_secret or not hmac.compare_digest(expected, signature):
+        flash("Payment verification failed.", "danger")
+        return redirect(url_for("invoices.pay", id=invoice.id))
+    try:
+        record_invoice_payment(invoice, invoice.balance_amount or invoice.grand_total, date.today(), "Razorpay", payment_id, "Online payment", None)
+        db.session.commit()
+        flash("Payment successful.", "success")
+    except Exception as exc:
+        db.session.rollback(); flash(str(exc), "danger")
+    return redirect(url_for("invoices.pay", id=invoice.id))

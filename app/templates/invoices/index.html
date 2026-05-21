@@ -19,7 +19,7 @@
         <td>{{ invoice.invoice_date }}</td><td>{{ invoice.due_date or '' }}</td><td>{{ invoice.customer.name }}</td>
         <td>{{ invoice.grand_total }}</td><td>{{ invoice.paid_amount }}</td><td>{{ invoice.balance_amount }}</td>
         <td><span class="badge text-bg-{{ 'success' if invoice.display_status == 'Paid' else 'danger' if invoice.display_status in ['Overdue','Cancelled'] else 'warning' if invoice.display_status == 'Draft' else 'primary' }}">{{ invoice.display_status }}</span></td>
-        <td class="table-actions"><a class="btn btn-sm btn-outline-secondary" href="{{ url_for('invoices.print_invoice', id=invoice.id) }}"><i class="bi bi-printer"></i></a><a class="btn btn-sm btn-outline-primary" href="{{ url_for('invoices.pdf', id=invoice.id) }}"><i class="bi bi-filetype-pdf"></i></a></td>
+        <td class="table-actions"><a class="btn btn-sm btn-outline-secondary" href="{{ url_for('invoices.print_invoice', id=invoice.id) }}"><i class="bi bi-printer"></i></a><a class="btn btn-sm btn-outline-primary" href="{{ url_for('invoices.pdf', id=invoice.id) }}"><i class="bi bi-filetype-pdf"></i></a>{% if config.RAZORPAY_KEY_ID %}<button class="btn btn-sm btn-outline-success" type="button" onclick="navigator.clipboard.writeText('{{ url_for('invoices.pay', id=invoice.id, _external=True) }}')"><i class="bi bi-link"></i></button>{% endif %}</td>
       </tr>
       {% endfor %}
     </tbody>

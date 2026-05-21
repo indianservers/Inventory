@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block content %}
 <div class="panel">
-  <button class="btn btn-outline-secondary mb-3" onclick="window.print()"><i class="bi bi-printer"></i> Print</button>
+  <div class="d-flex flex-wrap gap-2 mb-3"><button class="btn btn-outline-secondary" onclick="window.print()"><i class="bi bi-printer"></i> Print</button><a class="btn btn-outline-success" href="{{ url_for('reports.tax_summary', export='xlsx') }}"><i class="bi bi-file-earmark-excel"></i> Export Excel</a></div>
   <table class="table align-middle">
     <tbody>
       <tr><th>Output tax on sales</th><td class="text-end">{{ "%.2f"|format(sales_tax) }}</td></tr>

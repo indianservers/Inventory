@@ -154,3 +154,73 @@ class ProductBatch(db.Model):
         from datetime import date
 
         return bool(self.expiry_date and self.expiry_date < date.today())
+
+
+class PriceList(db.Model):
+    __tablename__ = 'price_lists'
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(120), nullable=False)
+    description = db.Column(db.Text)
+    discount_pct = db.Column(db.Numeric(5, 2), default=0)
+    is_default = db.Column(db.Boolean, default=False)
+    currency = db.Column(db.String(10), default='INR')
+    valid_from = db.Column(db.Date)
+    valid_to = db.Column(db.Date)
+    status = db.Column(db.Boolean, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    items = db.relationship('PriceListItem', backref='price_list', lazy='dynamic', cascade='all, delete-orphan')
+
+
+class PriceListItem(db.Model):
+    __tablename__ = 'price_list_items'
+    id = db.Column(db.Integer, primary_key=True)
+    price_list_id = db.Column(db.Integer, db.ForeignKey('price_lists.id', ondelete='CASCADE'), nullable=False)
+    product_id = db.Column(db.Integer, db.ForeignKey('products.id'), nullable=False)
+    sales_price = db.Column(db.Numeric(12, 2), nullable=False)
+    min_qty = db.Column(db.Numeric(12, 3), default=1)
+    product = db.relationship('Product', backref='price_list_items')
+    __table_args__ = (db.UniqueConstraint('price_list_id', 'product_id', 'min_qty', name='uq_price_list_item'),)
+
+
+class BillOfMaterials(db.Model):
+    __tablename__ = 'bill_of_materials'
+    id = db.Column(db.Integer, primary_key=True)
+    product_id = db.Column(db.Integer, db.ForeignKey('products.id'), nullable=False)
+    name = db.Column(db.String(150), nullable=False)
+    yield_qty = db.Column(db.Numeric(12, 3), default=1)
+    version = db.Column(db.String(20), default='1')
+    is_active = db.Column(db.Boolean, default=True)
+    notes = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    product = db.relationship('Product', backref='boms', foreign_keys=[product_id])
+    items = db.relationship('BOMItem', backref='bom', lazy='dynamic', cascade='all, delete-orphan')
+
+
+class BOMItem(db.Model):
+    __tablename__ = 'bom_items'
+    id = db.Column(db.Integer, primary_key=True)
+    bom_id = db.Column(db.Integer, db.ForeignKey('bill_of_materials.id', ondelete='CASCADE'), nullable=False)
+    component_id = db.Column(db.Integer, db.ForeignKey('products.id'), nullable=False)
+    quantity = db.Column(db.Numeric(12, 3), nullable=False)
+    unit_id = db.Column(db.Integer, db.ForeignKey('units.id'), nullable=True)
+    waste_pct = db.Column(db.Numeric(5, 2), default=0)
+    component = db.relationship('Product', backref='bom_component_lines', foreign_keys=[component_id])
+    unit = db.relationship('Unit', backref='bom_items')
+
+
+class ManufacturingOrder(db.Model):
+    __tablename__ = 'manufacturing_orders'
+    id = db.Column(db.Integer, primary_key=True)
+    mo_no = db.Column(db.String(30), unique=True, nullable=False)
+    bom_id = db.Column(db.Integer, db.ForeignKey('bill_of_materials.id'), nullable=False)
+    warehouse_id = db.Column(db.Integer, db.ForeignKey('warehouses.id'), nullable=False)
+    planned_qty = db.Column(db.Numeric(12, 3), nullable=False)
+    produced_qty = db.Column(db.Numeric(12, 3), default=0)
+    planned_date = db.Column(db.Date)
+    completed_date = db.Column(db.Date)
+    status = db.Column(db.String(20), default='Draft')
+    notes = db.Column(db.Text)
+    created_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    bom = db.relationship('BillOfMaterials', backref='manufacturing_orders')
+    warehouse = db.relationship('Warehouse', backref='manufacturing_orders')

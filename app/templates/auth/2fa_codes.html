@@ -1,0 +1,2 @@
+{% extends "base.html" %}{% block content %}<div class="panel" style="max-width:520px"><h2 class="h5">Backup Codes</h2><p>Save these codes now. They will not be shown again.</p><pre>{% for code in codes %}{{ code }}
+{% endfor %}</pre><a class="btn btn-primary" href="{{ url_for('auth.profile') }}">Done</a></div>{% endblock %}

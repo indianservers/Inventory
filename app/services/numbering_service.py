@@ -13,6 +13,12 @@ MODEL_FIELD = {
     "payment": ("PaymentMade", "voucher_no", "payment_prefix", "PAY"),
     "sales_return": ("SalesReturn", "return_no", "sales_return_prefix", "SR"),
     "purchase_return": ("PurchaseReturn", "return_no", "purchase_return_prefix", "PR"),
+    "purchase_order": ("PurchaseOrder", "po_no", None, "PO"),
+    "grn": ("GoodsReceiptNote", "grn_no", None, "GRN"),
+    "pos_session": ("POSSession", "session_no", None, "POS"),
+    "credit_note": ("CreditNote", "cn_no", None, "CN"),
+    "debit_note": ("DebitNote", "dn_no", None, "DN"),
+    "manufacturing_order": ("ManufacturingOrder", "mo_no", None, "MO"),
     "journal": ("JournalEntry", "entry_no", None, "JV"),
     "stock_adjustment": ("StockAdjustment", "adjustment_no", None, "SA"),
     "stock_transfer": ("StockTransfer", "transfer_no", None, "ST"),
@@ -42,4 +48,3 @@ def next_number(kind):
         except (ValueError, IndexError):
             sequence = 1
     return f"{stem}{sequence:05d}"
-

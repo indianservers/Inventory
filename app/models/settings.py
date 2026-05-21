@@ -58,6 +58,45 @@ class PrintTemplate(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 
+class Currency(db.Model):
+    __tablename__ = "currencies"
+    id = db.Column(db.Integer, primary_key=True)
+    code = db.Column(db.String(10), unique=True, nullable=False)
+    name = db.Column(db.String(80), nullable=False)
+    symbol = db.Column(db.String(10), default="")
+    exchange_rate = db.Column(db.Numeric(12, 6), default=1)
+    is_base = db.Column(db.Boolean, default=False)
+    auto_update = db.Column(db.Boolean, default=False)
+    last_updated = db.Column(db.DateTime)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+
+class ExchangeRateLog(db.Model):
+    __tablename__ = "exchange_rate_logs"
+    id = db.Column(db.Integer, primary_key=True)
+    currency_id = db.Column(db.Integer, db.ForeignKey("currencies.id"), nullable=False)
+    rate = db.Column(db.Numeric(12, 6), nullable=False)
+    fetched_at = db.Column(db.DateTime, default=datetime.utcnow)
+    currency = db.relationship("Currency", backref="rate_logs")
+
+
+class ScheduledReport(db.Model):
+    __tablename__ = "scheduled_reports"
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(120), nullable=False)
+    report_type = db.Column(db.String(30), nullable=False)
+    frequency = db.Column(db.String(20), default="Daily")
+    day_of_week = db.Column(db.Integer)
+    day_of_month = db.Column(db.Integer)
+    time_of_day = db.Column(db.String(5), default="09:00")
+    recipient_emails = db.Column(db.Text)
+    format = db.Column(db.String(10), default="Excel")
+    is_active = db.Column(db.Boolean, default=True)
+    last_sent_at = db.Column(db.DateTime)
+    created_by = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+
 class ApiToken(db.Model):
     __tablename__ = "api_tokens"
     id = db.Column(db.Integer, primary_key=True)

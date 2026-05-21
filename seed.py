@@ -12,10 +12,14 @@ from app.models import (
     ExpenseCategory,
     FinancialYear,
     Permission,
+    PriceList,
+    PrintTemplate,
     Product,
     Role,
     RolePermission,
     Supplier,
+    Currency,
+    TDSSection,
     Tax,
     Unit,
     User,
@@ -25,7 +29,7 @@ from app.models import (
 app = create_app()
 
 ROLES = ["Super Admin", "Admin", "Accountant", "Sales Executive", "Purchase Executive", "Stock Manager", "Viewer"]
-MODULES = ["dashboard", "products", "categories", "brands", "units", "warehouses", "customers", "suppliers", "purchases", "sales", "invoices", "returns", "quotations", "payments", "stock", "accounts", "expenses", "reports", "settings", "backup", "audit"]
+MODULES = ["dashboard", "products", "categories", "brands", "units", "warehouses", "customers", "suppliers", "purchases", "purchase_orders", "grn", "pos", "price_lists", "manufacturing", "recurring", "sales", "invoices", "returns", "quotations", "payments", "stock", "accounts", "expenses", "reports", "settings", "scheduled_reports", "backup", "audit"]
 ACTIONS = ["view", "create", "edit", "delete", "print", "export", "approve"]
 
 
@@ -78,6 +82,23 @@ with app.app_context():
         db.session.add(CompanySetting(company_name="Vyapara ERP", address="Your business address", phone="9999999999", email="admin@example.com", tax_number="GSTIN000000000", default_invoice_terms="Goods once sold are subject to business terms."))
 
     warehouse = get_or_create(Warehouse, code="MAIN", defaults={"name": "Main Warehouse", "status": True})
+    get_or_create(Warehouse, code="POS", defaults={"name": "POS Warehouse", "status": True})
+    get_or_create(PriceList, name="Default Retail", defaults={"description": "Default customer price list", "discount_pct": 0, "currency": "INR", "is_default": True, "status": True})
+    get_or_create(Currency, code="INR", defaults={"name": "Indian Rupee", "symbol": "Rs.", "exchange_rate": 1, "is_base": True})
+    get_or_create(Currency, code="USD", defaults={"name": "US Dollar", "symbol": "$", "exchange_rate": 83, "auto_update": True})
+    get_or_create(Currency, code="EUR", defaults={"name": "Euro", "symbol": "€", "exchange_rate": 90, "auto_update": True})
+    get_or_create(Currency, code="AED", defaults={"name": "UAE Dirham", "symbol": "د.إ", "exchange_rate": 22.6, "auto_update": True})
+    get_or_create(Currency, code="GBP", defaults={"name": "British Pound", "symbol": "£", "exchange_rate": 105, "auto_update": True})
+    get_or_create(TDSSection, section_code="194C", defaults={"description": "Contractor payments", "default_rate": 1, "threshold_amount": 30000, "is_active": True})
+    get_or_create(TDSSection, section_code="194J", defaults={"description": "Professional fees", "default_rate": 10, "threshold_amount": 30000, "is_active": True})
+    get_or_create(TDSSection, section_code="194I", defaults={"description": "Rent", "default_rate": 10, "threshold_amount": 240000, "is_active": True})
+    get_or_create(TDSSection, section_code="194H", defaults={"description": "Commission or brokerage", "default_rate": 5, "threshold_amount": 15000, "is_active": True})
+    for name, html, is_default in [
+        ("Classic", "<h1>{{ company.company_name }}</h1><h2>Tax Invoice {{ invoice.invoice_no }}</h2><p>{{ invoice.customer.name }}</p><table width='100%' border='1'>{% for item in items %}<tr><td>{{ item.product.name }}</td><td>{{ item.quantity }}</td><td>{{ item.line_total }}</td></tr>{% endfor %}</table><h3>Total {{ invoice.grand_total }}</h3>", True),
+        ("Modern", "<div style='font-family:Arial'><div style='text-align:right'><strong>{{ company.company_name }}</strong></div><h2>Invoice {{ invoice.invoice_no }}</h2><p>{{ invoice.customer.name }}</p>{% for item in items %}<p>{{ item.product.name }} - {{ item.line_total }}</p>{% endfor %}<h2>{{ invoice.grand_total }}</h2></div>", False),
+        ("Thermal", "<div style='width:80mm;font-family:monospace'><center>{{ company.company_name }}<br>Invoice {{ invoice.invoice_no }}</center>{% for item in items %}<div>{{ item.product.name }} x {{ item.quantity }} = {{ item.line_total }}</div>{% endfor %}<hr>Total {{ invoice.grand_total }}</div>", False),
+    ]:
+        get_or_create(PrintTemplate, name=name, template_type="sales_invoice", defaults={"html": html, "is_default": is_default})
     unit = get_or_create(Unit, name="Piece", defaults={"short_name": "pcs", "decimal_allowed": False, "status": True})
     get_or_create(Unit, name="Kilogram", defaults={"short_name": "kg", "decimal_allowed": True, "status": True})
     category = get_or_create(Category, name="General", defaults={"description": "General items", "status": True})

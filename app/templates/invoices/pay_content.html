@@ -1,0 +1,5 @@
+<div class="auth-page"><div class="auth-card">
+  <h1 class="h4">Pay Invoice {{ invoice.invoice_no }}</h1>
+  <p>{{ invoice.customer.name }}<br>Total {{ invoice.grand_total }} | Balance {{ invoice.balance_amount }}</p>
+  {% if key_id %}<button id="pay-now" class="btn btn-primary w-100">Pay Now</button>{% else %}<div class="alert alert-warning">Set RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET to enable online payments.</div>{% endif %}
+</div></div>

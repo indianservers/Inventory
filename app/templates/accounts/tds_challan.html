@@ -1,0 +1,4 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="panel"><h2 class="h5">Total TDS Deducted: {{ "%.2f"|format(total) }}</h2><table class="table datatable"><thead><tr><th>Date</th><th>Section</th><th>Party</th><th>Reference</th><th>Amount</th></tr></thead><tbody>{% for e in entries %}<tr><td>{{ e.entry_date }}</td><td>{{ e.section.section_code }}</td><td>{{ e.party_type }} #{{ e.party_id }}</td><td>{{ e.reference_no }}</td><td>{{ e.tds_amount }}</td></tr>{% endfor %}</tbody></table></div>
+{% endblock %}

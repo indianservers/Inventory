@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="pos-shell" data-warehouse-id="{{ warehouse.id if warehouse else '' }}" data-walkin-id="{{ walkin.id if walkin else '' }}">
+  <section class="product-browser">
+    <div class="browser-toolbar"><div class="input-group"><span class="input-group-text"><i class="bi bi-upc-scan"></i></span><input class="form-control" id="pos-search" autofocus placeholder="Scan barcode or search product [F2]"></div><button class="btn btn-outline-secondary" id="pos-clear" type="button"><i class="bi bi-x-lg"></i></button></div>
+    <div class="category-strip"><button class="category-chip active" data-category="all" type="button">All</button>{% for c in categories %}<button class="category-chip" type="button" data-category="{{ c.name|lower }}">{{ c.name }}</button>{% endfor %}</div>
+    <div class="product-grid">{% for p in products %}{% set img = p.images.filter_by(is_primary=True).first() or p.images.first() %}<button class="product-tile pos-product" type="button" data-id="{{ p.id }}" data-name="{{ p.name }}" data-rate="{{ p.sales_price }}" data-tax="{{ p.tax.rate if p.tax else 0 }}" data-stock="{{ p.current_stock }}" data-barcode="{{ p.barcode or '' }}" data-category="{{ (p.category.name if p.category else 'uncategorized')|lower }}" data-search="{{ (p.name ~ ' ' ~ p.sku ~ ' ' ~ (p.barcode or ''))|lower }}"><span class="product-art" {% if img %}style="background-image:url('{{ url_for('static', filename=img.image_path) }}')" {% endif %}>{% if not img %}<i class="bi bi-box"></i>{% endif %}</span><span class="product-info"><strong>{{ p.name }}</strong><span>Stock {{ p.current_stock }}</span></span><span class="product-price">{{ p.sales_price }}</span></button>{% endfor %}</div>
+  </section>
+  <aside class="cart-panel">
+    <div class="cart-head"><div><span class="eyebrow">POS</span><h2>Cart</h2></div><div class="cart-tools"><button class="btn btn-sm btn-outline-secondary" id="hold-cart" type="button">Hold</button><button class="btn btn-sm btn-outline-secondary" id="recall-cart" type="button">Recall</button></div></div>
+    <div class="p-2"><select id="pos-customer" class="form-select"><option value="{{ walkin.id if walkin else '' }}">Walk-in Customer</option>{% for c in customers %}<option value="{{ c.id }}">{{ c.name }}</option>{% endfor %}</select></div>
+    <div id="pos-cart" class="cart-dropzone"></div>
+    <div class="cart-summary">
+      <div><span>Subtotal</span><input id="pos-subtotal" readonly value="0.00"></div>
+      <div><span>Discount</span><input id="pos-discount" type="number" step="0.01" value="0"></div>
+      <div><span>Tax</span><input id="pos-tax" readonly value="0.00"></div>
+      <div class="summary-total"><span>Total</span><input id="pos-total" readonly value="0.00"></div>
+    </div>
+    <div class="p-2 d-grid gap-2">
+      <div class="btn-group"><button class="btn btn-outline-primary pay-mode active" data-mode="Cash" type="button">Cash</button><button class="btn btn-outline-primary pay-mode" data-mode="Card" type="button">Card</button><button class="btn btn-outline-primary pay-mode" data-mode="UPI" type="button">UPI</button><button class="btn btn-outline-primary pay-mode" data-mode="Split" type="button">Split</button></div>
+      <input class="form-control" id="cash-tendered" type="number" step="0.01" placeholder="Cash tendered">
+      <input class="form-control" id="card-amount" type="number" step="0.01" placeholder="Card amount">
+      <input class="form-control" id="upi-amount" type="number" step="0.01" placeholder="UPI amount">
+      <input class="form-control" id="reference-no" placeholder="Card/UPI reference">
+      <button class="btn btn-success btn-lg" id="charge-btn" type="button">CHARGE [F12]</button>
+      <form method="post" action="{{ url_for('pos.close_session') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><div class="input-group"><input class="form-control" name="closing_cash" placeholder="Closing cash"><button class="btn btn-outline-danger">Close</button></div></form>
+    </div>
+  </aside>
+</div>
+<div class="modal fade" id="receiptModal" tabindex="-1"><div class="modal-dialog"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">Receipt</h5></div><div class="modal-body" id="receiptBody"></div><div class="modal-footer"><a class="btn btn-outline-secondary" id="printReceipt" target="_blank">Print</a><button class="btn btn-primary" data-bs-dismiss="modal">Done</button></div></div></div></div>
+{% endblock %}
+{% block scripts %}<script src="{{ url_for('static', filename='js/pos.js') }}"></script>{% endblock %}

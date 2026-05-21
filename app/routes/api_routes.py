@@ -6,7 +6,7 @@ from flask_login import login_required
 from werkzeug.security import check_password_hash
 
 from app.extensions import csrf, db
-from app.models import ApiToken, AuditLog, Customer, Product, Purchase, Sale, Supplier
+from app.models import ApiToken, AuditLog, Customer, PriceList, Product, Purchase, Sale, Supplier
 
 bp = Blueprint("api", __name__, url_prefix="/api")
 RATE_LIMIT = {}
@@ -184,6 +184,16 @@ def sales():
 def sale_detail(id):
     s = Sale.query.get_or_404(id)
     return jsonify({"id": s.id, "invoice_no": s.invoice_no, "customer": s.customer.name, "total": float(s.grand_total), "items": [{"product": i.product.name, "qty": float(i.quantity), "total": float(i.line_total)} for i in s.items]})
+
+
+@bp.route("/customer/<int:id>/price-list")
+@login_required
+def customer_price_list(id):
+    customer = Customer.query.get_or_404(id)
+    pl = customer.price_list or PriceList.query.filter_by(is_default=True, status=True).first()
+    if not pl:
+        return jsonify({"price_list_id": None, "items": {}})
+    return jsonify({"price_list_id": pl.id, "items": {str(item.product_id): float(item.sales_price) for item in pl.items}})
 
 
 @bp.route("/invoices")

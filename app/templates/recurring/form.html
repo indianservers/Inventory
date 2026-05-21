@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block content %}
+<form class="panel" method="post">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <div class="form-grid">
+    <div><label class="form-label">Name</label><input class="form-control" name="name" value="{{ recurring.name or '' }}" required></div>
+    <div><label class="form-label">Customer</label><select class="form-select" name="customer_id" required><option value="">Select</option>{% for c in customers %}<option value="{{ c.id }}" {% if recurring.customer_id == c.id %}selected{% endif %}>{{ c.name }}</option>{% endfor %}</select></div>
+    <div><label class="form-label">Warehouse</label><select class="form-select" name="warehouse_id" required><option value="">Select</option>{% for w in warehouses %}<option value="{{ w.id }}" {% if recurring.warehouse_id == w.id %}selected{% endif %}>{{ w.name }}</option>{% endfor %}</select></div>
+    <div><label class="form-label">Frequency</label><select class="form-select" name="frequency">{% for f in frequencies %}<option {% if recurring.frequency == f %}selected{% endif %}>{{ f }}</option>{% endfor %}</select></div>
+    <div><label class="form-label">Interval</label><input class="form-control" type="number" min="1" name="interval_value" value="{{ recurring.interval_value or 1 }}"></div>
+    <div><label class="form-label">Next Run</label><input class="form-control" type="date" name="next_run_date" value="{{ recurring.next_run_date }}" required></div>
+    <div><label class="form-label">End Date</label><input class="form-control" type="date" name="end_date" value="{{ recurring.end_date or '' }}"></div>
+    <label class="form-check mt-4"><input class="form-check-input" type="checkbox" name="auto_send" {% if recurring.auto_send %}checked{% endif %}> Auto-send</label>
+    <label class="form-check mt-4"><input class="form-check-input" type="checkbox" name="auto_collect" {% if recurring.auto_collect %}checked{% endif %}> Auto-collect</label>
+  </div>
+  <hr>
+  <div class="d-flex justify-content-between"><h2 class="h6">Items</h2><button class="btn btn-sm btn-outline-primary" id="add-row" type="button"><i class="bi bi-plus-lg"></i></button></div>
+  <div id="items" class="mt-2">{% for item in items %}
+    <div class="item-row mb-2">
+      <select name="product_id[]" class="form-select product-select" required><option value="">Product</option>{% for p in product_options %}<option value="{{ p.id }}" {% if item.product_id == p.id %}selected{% endif %}>{{ p.text }}</option>{% endfor %}</select>
+      <input name="quantity[]" class="form-control qty" type="number" step="0.001" value="{{ item.quantity }}">
+      <input name="rate[]" class="form-control rate" type="number" step="0.01" value="{{ item.rate }}">
+      <input name="discount[]" class="form-control discount" type="number" step="0.01" value="{{ item.discount }}">
+      <input name="tax_rate[]" class="form-control tax" type="number" step="0.01" value="{{ item.tax_rate }}">
+      <input class="form-control line-total" readonly value="{{ item.line_total }}">
+      <button class="btn btn-outline-danger remove-row" type="button"><i class="bi bi-trash"></i></button>
+    </div>
+  {% endfor %}</div>
+  <label class="form-label mt-3">Terms</label><textarea class="form-control" name="terms">{{ recurring.terms or '' }}</textarea>
+  <label class="form-label mt-3">Notes</label><textarea class="form-control" name="notes">{{ recurring.notes or '' }}</textarea>
+  <div class="sticky-actions d-flex justify-content-between align-items-center"><span class="text-muted">Recurring invoices generate draft sales invoices on schedule.</span><button class="btn btn-primary">Save</button></div>
+</form>
+{% endblock %}
+{% block scripts %}<script src="{{ url_for('static', filename='js/invoice.js') }}"></script><script>document.addEventListener("DOMContentLoaded",()=>initInvoiceForm("sale"));</script>{% endblock %}

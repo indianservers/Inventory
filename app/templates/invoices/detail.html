@@ -37,6 +37,7 @@
         {% endif %}
         <a class="btn btn-outline-secondary" href="{{ url_for('invoices.print_invoice', id=invoice.id) }}"><i class="bi bi-printer"></i> Print</a>
         <a class="btn btn-outline-primary" href="{{ url_for('invoices.pdf', id=invoice.id) }}"><i class="bi bi-filetype-pdf"></i> PDF</a>
+        {% if config.RAZORPAY_KEY_ID %}<button class="btn btn-outline-success" type="button" onclick="navigator.clipboard.writeText('{{ url_for('invoices.pay', id=invoice.id, _external=True) }}')"><i class="bi bi-link-45deg"></i> Send Payment Link</button><input class="form-control" readonly value="{{ url_for('invoices.pay', id=invoice.id, _external=True) }}">{% else %}<div class="alert alert-warning small">Set Razorpay keys to enable payment links.</div>{% endif %}
       </div>
     </div>
     {% if invoice.status not in ['Draft','Cancelled','Paid'] and invoice.balance_amount|float > 0 %}

@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="d-flex justify-content-end mb-3"><a class="btn btn-primary" href="{{ url_for('settings.template_create') }}">Create Template</a></div>
+<div class="row g-3">{% for template in templates %}
+  <div class="col-md-4"><div class="panel h-100">
+    <div class="d-flex justify-content-between"><h2 class="h6">{{ template.name }}</h2>{% if template.is_default %}<span class="badge text-bg-success">Default</span>{% endif %}</div>
+    <p class="text-muted">{{ template.template_type }}</p>
+    <div class="border rounded bg-light mb-3" style="height:120px;overflow:hidden">{{ template.html|safe }}</div>
+    <a class="btn btn-sm btn-outline-primary" href="{{ url_for('settings.template_edit', id=template.id) }}">Edit</a>
+    <a class="btn btn-sm btn-outline-secondary" target="_blank" href="{{ url_for('settings.template_preview', id=template.id) }}">Preview</a>
+    <form class="d-inline" method="post" action="{{ url_for('settings.template_default', id=template.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn btn-sm btn-outline-success">Set Default</button></form>
+  </div></div>
+{% endfor %}</div>
+{% endblock %}

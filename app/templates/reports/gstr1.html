@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="panel mb-3">
+  <form class="row g-2 align-items-end" method="get">
+    <div class="col-md-2"><label class="form-label">Month</label><input class="form-control" name="month" type="number" min="1" max="12" value="{{ month }}"></div>
+    <div class="col-md-2"><label class="form-label">Year</label><input class="form-control" name="year" type="number" value="{{ year }}"></div>
+    <div class="col-md-8 d-flex flex-wrap gap-2">
+      <button class="btn btn-outline-primary"><i class="bi bi-funnel"></i> Preview</button>
+      <a class="btn btn-primary" href="{{ url_for('reports.gstr1_report', month=month, year=year, download='json') }}"><i class="bi bi-download"></i> Download JSON</a>
+      <a class="btn btn-outline-secondary" href="{{ url_for('reports.gstr1_report', month=month, year=year, download='csv') }}"><i class="bi bi-filetype-csv"></i> Download CSV</a>
+    </div>
+  </form>
+</div>
+<div class="panel">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h2 class="h5 mb-0">GSTR-1 Preview {{ "%02d"|format(month) }}/{{ year }}</h2>
+    <span class="badge text-bg-primary">{{ preview|length }} taxable rows</span>
+  </div>
+  <table class="table datatable align-middle">
+    <thead><tr><th>Invoice</th><th>Date</th><th>Customer</th><th>GSTIN</th><th>HSN</th><th>Taxable</th><th>Tax</th><th>Total</th></tr></thead>
+    <tbody>{% for row in preview %}<tr>
+      <td>{{ row.invoice_no }}</td><td>{{ row.date }}</td><td>{{ row.customer }}</td><td>{{ row.gstin or 'B2C' }}</td><td>{{ row.hsn }}</td>
+      <td>{{ "%.2f"|format(row.taxable) }}</td><td>{{ "%.2f"|format(row.tax) }}</td><td>{{ "%.2f"|format(row.total) }}</td>
+    </tr>{% endfor %}</tbody>
+  </table>
+</div>
+{% endblock %}

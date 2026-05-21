@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <form method="post" action="{{ url_for('recurring.run_due') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn btn-outline-primary">Run Due</button></form>
+  <a class="btn btn-primary" href="{{ url_for('recurring.create') }}"><i class="bi bi-plus-lg"></i> New Recurring Invoice</a>
+</div>
+<div class="panel">
+  <table class="table datatable align-middle">
+    <thead><tr><th>Name</th><th>Customer</th><th>Frequency</th><th>Next Run</th><th>Status</th><th class="text-end">Actions</th></tr></thead>
+    <tbody>{% for row in rows %}<tr>
+      <td>{{ row.name }}</td><td>{{ row.customer.name }}</td><td>{{ row.frequency }} / {{ row.interval_value }}</td><td>{{ row.next_run_date }}</td><td><span class="badge text-bg-{{ 'success' if row.status == 'Active' else 'secondary' }}">{{ row.status }}</span></td>
+      <td class="text-end">
+        <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('recurring.history', id=row.id) }}">History</a>
+        <a class="btn btn-sm btn-outline-primary" href="{{ url_for('recurring.edit', id=row.id) }}">Edit</a>
+        <form class="d-inline" method="post" action="{{ url_for('recurring.pause', id=row.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn btn-sm btn-outline-warning">{{ 'Resume' if row.status == 'Paused' else 'Pause' }}</button></form>
+        <form class="d-inline" method="post" action="{{ url_for('recurring.run_now', id=row.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn btn-sm btn-success">Run Now</button></form>
+      </td>
+    </tr>{% endfor %}</tbody>
+  </table>
+</div>
+{% endblock %}
