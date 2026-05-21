@@ -11,6 +11,8 @@
     <div><label class="form-label">Refund Mode</label><select class="form-select" name="refund_mode"><option>Debit Note</option><option>Cash Refund</option><option>Bank Refund</option></select></div>
   </div>
   <hr><div class="d-flex justify-content-between"><h2 class="h6">Items</h2><button class="btn btn-sm btn-outline-primary" id="add-row" type="button"><i class="bi bi-plus-lg"></i></button></div><div id="items" class="mt-2"></div>
+  <div class="alert alert-info small mt-3">For serial-tracked products, enter serial numbers line-wise to mark them returned.</div>
+  <div class="row g-2">{% for n in range(5) %}<div class="col-md-12"><input class="form-control" name="serial_numbers[]" placeholder="Serials for line {{ n + 1 }}"></div>{% endfor %}</div>
   {% include "shared/totals.html" %}
   <label class="form-label mt-3">Reason</label><textarea class="form-control" name="reason"></textarea>
   <label class="form-label mt-3">Notes</label><textarea class="form-control" name="notes"></textarea>

@@ -4,6 +4,7 @@ from flask_login import current_user, login_required
 from app.extensions import db
 from app.models import Customer, CustomerLedger, Supplier, SupplierLedger, TDSSection
 from app.utils.excel_export import export_to_excel
+from app.utils.tax_validation import is_valid_gstin, is_valid_pan
 
 XLSX_MIMETYPE = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 
@@ -11,23 +12,31 @@ bp = Blueprint("parties", __name__, url_prefix="/parties")
 
 
 def save_customer(obj):
-    for field in ["customer_code", "name", "business_name", "email", "phone", "alt_phone", "billing_address", "shipping_address", "city", "state", "country", "postal_code", "gst_number", "pan_number", "payment_terms"]:
+    if not is_valid_gstin(request.form.get("gst_number")):
+        raise ValueError("Invalid GSTIN format or checksum.")
+    if not is_valid_pan(request.form.get("pan_number")):
+        raise ValueError("Invalid PAN format.")
+    for field in ["customer_code", "name", "business_name", "email", "phone", "alt_phone", "billing_address", "shipping_address", "city", "state", "country", "postal_code", "gst_number", "pan_number", "customer_type", "payment_terms"]:
         setattr(obj, field, request.form.get(field))
     obj.credit_limit = request.form.get("credit_limit") or 0
     obj.opening_balance = request.form.get("opening_balance") or 0
     obj.current_balance = obj.current_balance or obj.opening_balance
-    obj.tds_applicable = bool(request.form.get("tds_applicable"))
-    obj.tds_section_id = request.form.get("tds_section_id") or None
     obj.status = bool(request.form.get("status"))
     if not obj.id:
         obj.created_by = current_user.id
 
 
 def save_supplier(obj):
-    for field in ["supplier_code", "name", "business_name", "email", "phone", "alt_phone", "address", "city", "state", "country", "postal_code", "gst_number", "pan_number", "payment_terms"]:
+    if not is_valid_gstin(request.form.get("gst_number")):
+        raise ValueError("Invalid GSTIN format or checksum.")
+    if not is_valid_pan(request.form.get("pan_number")):
+        raise ValueError("Invalid PAN format.")
+    for field in ["supplier_code", "name", "business_name", "contact_person", "email", "phone", "alt_phone", "address", "billing_address", "city", "state", "country", "postal_code", "gst_number", "pan_number", "tax_treatment", "payment_terms"]:
         setattr(obj, field, request.form.get(field))
     obj.opening_balance = request.form.get("opening_balance") or 0
     obj.current_balance = obj.current_balance or obj.opening_balance
+    obj.tds_applicable = bool(request.form.get("tds_applicable"))
+    obj.tds_section_id = request.form.get("tds_section_id") or None
     obj.status = bool(request.form.get("status"))
     if not obj.id:
         obj.created_by = current_user.id
@@ -44,8 +53,11 @@ def customers():
 def customer_create():
     obj = Customer(country="India", status=True)
     if request.method == "POST":
-        save_customer(obj); db.session.add(obj); db.session.commit(); flash("Customer saved.", "success")
-        return redirect(url_for("parties.customers"))
+        try:
+            save_customer(obj); db.session.add(obj); db.session.commit(); flash("Customer saved.", "success")
+            return redirect(url_for("parties.customers"))
+        except ValueError as exc:
+            flash(str(exc), "danger")
     return render_template("parties/customer_form.html", title="Create Customer", item=obj)
 
 
@@ -54,8 +66,11 @@ def customer_create():
 def customer_edit(id):
     obj = Customer.query.get_or_404(id)
     if request.method == "POST":
-        save_customer(obj); db.session.commit(); flash("Customer updated.", "success")
-        return redirect(url_for("parties.customers"))
+        try:
+            save_customer(obj); db.session.commit(); flash("Customer updated.", "success")
+            return redirect(url_for("parties.customers"))
+        except ValueError as exc:
+            flash(str(exc), "danger")
     return render_template("parties/customer_form.html", title="Edit Customer", item=obj)
 
 
@@ -80,8 +95,11 @@ def suppliers():
 def supplier_create():
     obj = Supplier(country="India", status=True)
     if request.method == "POST":
-        save_supplier(obj); db.session.add(obj); db.session.commit(); flash("Supplier saved.", "success")
-        return redirect(url_for("parties.suppliers"))
+        try:
+            save_supplier(obj); db.session.add(obj); db.session.commit(); flash("Supplier saved.", "success")
+            return redirect(url_for("parties.suppliers"))
+        except ValueError as exc:
+            flash(str(exc), "danger")
     return render_template("parties/supplier_form.html", title="Create Supplier", item=obj, tds_sections=TDSSection.query.filter_by(is_active=True).all())
 
 
@@ -90,8 +108,11 @@ def supplier_create():
 def supplier_edit(id):
     obj = Supplier.query.get_or_404(id)
     if request.method == "POST":
-        save_supplier(obj); db.session.commit(); flash("Supplier updated.", "success")
-        return redirect(url_for("parties.suppliers"))
+        try:
+            save_supplier(obj); db.session.commit(); flash("Supplier updated.", "success")
+            return redirect(url_for("parties.suppliers"))
+        except ValueError as exc:
+            flash(str(exc), "danger")
     return render_template("parties/supplier_form.html", title="Edit Supplier", item=obj, tds_sections=TDSSection.query.filter_by(is_active=True).all())
 
 

@@ -1,15 +1,19 @@
 import logging
+import json
 import os
 import smtplib
 from email.message import EmailMessage
 
+from app.models import IntegrationSetting
+
 
 def send_email(to, subject, body_html, attachment_bytes=None, attachment_name=None):
-    host = os.environ.get("SMTP_HOST")
-    port = int(os.environ.get("SMTP_PORT") or 587)
-    user = os.environ.get("SMTP_USER")
-    password = os.environ.get("SMTP_PASS")
-    sender = os.environ.get("SMTP_FROM") or user
+    config = smtp_config()
+    host = config.get("host")
+    port = int(config.get("port") or 587)
+    user = config.get("user")
+    password = config.get("password")
+    sender = config.get("sender") or user
     if not host or not sender:
         logging.info("Email not configured")
         return False
@@ -31,3 +35,27 @@ def send_email(to, subject, body_html, attachment_bytes=None, attachment_name=No
             smtp.login(user, password)
         smtp.send_message(message)
     return True
+
+
+def smtp_config():
+    config = {
+        "host": os.environ.get("SMTP_HOST"),
+        "port": os.environ.get("SMTP_PORT") or 587,
+        "user": os.environ.get("SMTP_USER"),
+        "password": os.environ.get("SMTP_PASS"),
+        "sender": os.environ.get("SMTP_FROM"),
+    }
+    try:
+        setting = IntegrationSetting.query.filter_by(provider_type="email", is_active=True).order_by(IntegrationSetting.id.desc()).first()
+        if setting and setting.config_json:
+            data = json.loads(setting.config_json)
+            config.update({
+                "host": data.get("host") or data.get("SMTP_HOST") or config["host"],
+                "port": data.get("port") or data.get("SMTP_PORT") or config["port"],
+                "user": data.get("user") or data.get("SMTP_USER") or config["user"],
+                "password": data.get("password") or data.get("SMTP_PASS") or config["password"],
+                "sender": data.get("sender") or data.get("from") or data.get("SMTP_FROM") or config["sender"],
+            })
+    except Exception:
+        logging.exception("Unable to read SMTP integration settings")
+    return config

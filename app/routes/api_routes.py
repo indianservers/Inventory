@@ -6,7 +6,7 @@ from flask_login import login_required
 from werkzeug.security import check_password_hash
 
 from app.extensions import csrf, db
-from app.models import ApiToken, AuditLog, Customer, PriceList, Product, Purchase, Sale, Supplier
+from app.models import ApiToken, AuditLog, Customer, InventoryLedger, PaymentMade, PaymentReceived, PriceList, Product, Purchase, PurchaseOrder, Sale, SalesOrder, Supplier
 
 bp = Blueprint("api", __name__, url_prefix="/api")
 RATE_LIMIT = {}
@@ -299,6 +299,82 @@ def v1_suppliers():
     return jsonify(supplier_payload())
 
 
+@bp.route("/v1/vendors")
+@csrf.exempt
+@api_auth_required
+def v1_vendors():
+    return jsonify(supplier_payload())
+
+
+@bp.route("/v1/stock")
+@csrf.exempt
+@api_auth_required
+def v1_stock():
+    query = Product.query.filter_by(is_active=True)
+    if request.args.get("low_stock"):
+        query = query.filter(Product.current_stock <= Product.reorder_level)
+    return jsonify(paginated_response(query, lambda p: {"product_id": p.id, "sku": p.sku, "name": p.name, "current_stock": float(p.current_stock or 0), "reorder_level": float(p.reorder_level or 0), "warehouse_id": p.warehouse_id}, {"sku": Product.sku, "name": Product.name, "stock": Product.current_stock}))
+
+
+@bp.route("/v1/stock/movements")
+@csrf.exempt
+@api_auth_required
+def v1_stock_movements():
+    query = InventoryLedger.query
+    if request.args.get("product_id"):
+        query = query.filter(InventoryLedger.product_id == request.args["product_id"])
+    if request.args.get("warehouse_id"):
+        query = query.filter(InventoryLedger.warehouse_id == request.args["warehouse_id"])
+    return jsonify(paginated_response(query, lambda l: {"id": l.id, "date": l.date.isoformat() if l.date else None, "product_id": l.product_id, "warehouse_id": l.warehouse_id, "transaction_type": l.transaction_type, "quantity_in": float(l.quantity_in or 0), "quantity_out": float(l.quantity_out or 0)}, {"date": InventoryLedger.date}))
+
+
+@bp.route("/v1/pos-invoices")
+@csrf.exempt
+@api_auth_required
+def v1_pos_invoices():
+    query = Sale.query.filter(Sale.sale_type == "POS")
+    return jsonify(paginated_response(query, lambda s: {"id": s.id, "invoice_no": s.invoice_no, "date": s.invoice_date.isoformat(), "customer": s.customer.name if s.customer else "Walk-in Customer", "total": float(s.grand_total or 0), "status": s.display_status}, {"date": Sale.invoice_date, "total": Sale.grand_total}))
+
+
+@bp.route("/v1/sales-orders")
+@csrf.exempt
+@api_auth_required
+def v1_sales_orders():
+    query = apply_date_filters(SalesOrder.query, SalesOrder, "order_date")
+    return jsonify(paginated_response(query, lambda o: {"id": o.id, "order_no": o.order_no, "date": o.order_date.isoformat() if o.order_date else None, "customer": o.customer.name if o.customer else "", "status": o.status, "total": float(o.grand_total or 0)}, {"date": SalesOrder.order_date, "order_no": SalesOrder.order_no}))
+
+
+@bp.route("/v1/purchase-orders")
+@csrf.exempt
+@api_auth_required
+def v1_purchase_orders():
+    query = apply_date_filters(PurchaseOrder.query, PurchaseOrder, "po_date")
+    return jsonify(paginated_response(query, lambda p: {"id": p.id, "po_no": p.po_no, "date": p.po_date.isoformat() if p.po_date else None, "supplier": p.supplier.name if p.supplier else "", "status": p.status, "total": float(p.grand_total or 0)}, {"date": PurchaseOrder.po_date, "po_no": PurchaseOrder.po_no}))
+
+
+@bp.route("/v1/payments")
+@csrf.exempt
+@api_auth_required
+def v1_payments():
+    received = [{"id": p.id, "type": "received", "date": p.receipt_date.isoformat() if p.receipt_date else None, "party": p.customer.name if p.customer else "", "mode": p.payment_mode, "amount": float(p.amount or 0), "status": getattr(p, "status", "Posted")} for p in PaymentReceived.query.order_by(PaymentReceived.id.desc()).limit(100).all()]
+    made = [{"id": p.id, "type": "made", "date": p.voucher_date.isoformat() if p.voucher_date else None, "party": p.supplier.name if p.supplier else "", "mode": p.payment_mode, "amount": float(p.amount or 0), "status": getattr(p, "status", "Posted")} for p in PaymentMade.query.order_by(PaymentMade.id.desc()).limit(100).all()]
+    return jsonify({"data": received + made, "meta": {"total": len(received) + len(made)}})
+
+
+@bp.route("/v1/reports/summary")
+@csrf.exempt
+@api_auth_required
+def v1_reports_summary():
+    return jsonify({"data": profit_loss_payload()})
+
+
+@bp.route("/v1/webhooks/events")
+@csrf.exempt
+@api_auth_required
+def v1_webhook_events():
+    return jsonify({"data": ["product.created", "product.updated", "stock.low", "invoice.created", "invoice.paid", "invoice.cancelled", "payment.received", "purchase_order.created", "goods_received", "customer.created"]})
+
+
 @bp.route("/v1/reports/profit-loss")
 @csrf.exempt
 @api_auth_required
@@ -329,6 +405,14 @@ def openapi_spec():
             "/api/v1/products/{id}": {"put": {"summary": "Update product"}},
             "/api/v1/customers": {"get": {"summary": "List customers"}},
             "/api/v1/suppliers": {"get": {"summary": "List suppliers"}},
+            "/api/v1/vendors": {"get": {"summary": "List vendors"}},
+            "/api/v1/stock": {"get": {"summary": "Stock on hand"}},
+            "/api/v1/pos-invoices": {"get": {"summary": "List POS invoices"}},
+            "/api/v1/sales-orders": {"get": {"summary": "List sales orders"}},
+            "/api/v1/purchase-orders": {"get": {"summary": "List purchase orders"}},
+            "/api/v1/payments": {"get": {"summary": "List customer and vendor payments"}},
+            "/api/v1/reports/summary": {"get": {"summary": "Business summary"}},
+            "/api/v1/webhooks/events": {"get": {"summary": "Supported webhook events"}},
             "/api/v1/reports/profit-loss": {"get": {"summary": "Profit and loss summary"}},
         },
     }

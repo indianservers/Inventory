@@ -34,6 +34,7 @@ class StockAdjustment(db.Model):
     adjustment_no = db.Column(db.String(30), unique=True, nullable=False)
     adjustment_date = db.Column(db.Date, nullable=False)
     warehouse_id = db.Column(db.Integer, db.ForeignKey('warehouses.id'), nullable=False)
+    adjustment_type = db.Column(db.String(30), default='Other')
     reason = db.Column(db.String(100))
     notes = db.Column(db.Text)
     created_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
@@ -87,3 +88,45 @@ class StockTransferItem(db.Model):
     quantity = db.Column(db.Numeric(12, 3), nullable=False)
     rate = db.Column(db.Numeric(12, 4), default=0)
     product = db.relationship('Product', backref='transfer_items')
+
+
+class StockOpening(db.Model):
+    __tablename__ = 'stock_openings'
+    id = db.Column(db.Integer, primary_key=True)
+    opening_no = db.Column(db.String(30), unique=True, nullable=False)
+    opening_date = db.Column(db.Date, nullable=False)
+    product_id = db.Column(db.Integer, db.ForeignKey('products.id'), nullable=False)
+    warehouse_id = db.Column(db.Integer, db.ForeignKey('warehouses.id'), nullable=False)
+    quantity = db.Column(db.Numeric(12, 3), nullable=False)
+    rate = db.Column(db.Numeric(12, 4), default=0)
+    value = db.Column(db.Numeric(12, 2), default=0)
+    notes = db.Column(db.Text)
+    created_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    product = db.relationship('Product', backref='stock_openings')
+    warehouse = db.relationship('Warehouse', backref='stock_openings')
+
+
+class RepackingTransaction(db.Model):
+    __tablename__ = 'repacking_transactions'
+    id = db.Column(db.Integer, primary_key=True)
+    repack_no = db.Column(db.String(30), unique=True, nullable=False)
+    repack_date = db.Column(db.Date, nullable=False)
+    warehouse_id = db.Column(db.Integer, db.ForeignKey('warehouses.id'), nullable=False)
+    notes = db.Column(db.Text)
+    status = db.Column(db.String(20), default='Completed')
+    created_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    warehouse = db.relationship('Warehouse', backref='repacking_transactions')
+    items = db.relationship('RepackingItem', backref='transaction', lazy='dynamic', cascade='all, delete-orphan')
+
+
+class RepackingItem(db.Model):
+    __tablename__ = 'repacking_items'
+    id = db.Column(db.Integer, primary_key=True)
+    repacking_id = db.Column(db.Integer, db.ForeignKey('repacking_transactions.id', ondelete='CASCADE'), nullable=False)
+    line_type = db.Column(db.String(10), nullable=False)
+    product_id = db.Column(db.Integer, db.ForeignKey('products.id'), nullable=False)
+    quantity = db.Column(db.Numeric(12, 3), nullable=False)
+    rate = db.Column(db.Numeric(12, 4), default=0)
+    product = db.relationship('Product', backref='repacking_items')

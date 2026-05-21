@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="panel">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h2 class="h5 mb-0">Held Bills</h2>
+    <a class="btn btn-primary" href="{{ url_for('pos.terminal') }}">Back to POS</a>
+  </div>
+  <table class="table datatable">
+    <thead><tr><th>Hold No</th><th>Customer</th><th>Warehouse</th><th>Notes</th><th>Created</th><th>Status</th><th></th></tr></thead>
+    <tbody>
+      {% for bill in held_bills %}
+      <tr>
+        <td>{{ bill.hold_no }}</td>
+        <td>{{ bill.customer.name if bill.customer else 'Walk-in Customer' }}</td>
+        <td>{{ bill.warehouse.name if bill.warehouse else '' }}</td>
+        <td>{{ bill.notes }}</td>
+        <td>{{ bill.created_at }}</td>
+        <td>{{ bill.status }}</td>
+        <td><button class="btn btn-sm btn-success recall-held" data-url="{{ url_for('pos.held_bill_json', id=bill.id) }}">Recall</button></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+document.querySelectorAll(".recall-held").forEach(btn => btn.addEventListener("click", async () => {
+  const res = await fetch(btn.dataset.url);
+  const data = await res.json();
+  if (!res.ok) return alert(data.error || "Unable to recall bill");
+  localStorage.setItem("recalledCart", JSON.stringify(data));
+  window.location.href = "{{ url_for('pos.terminal') }}";
+}));
+</script>
+{% endblock %}

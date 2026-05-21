@@ -12,6 +12,7 @@ class Sale(db.Model):
     currency_id = db.Column(db.Integer, db.ForeignKey('currencies.id'), nullable=True)
     exchange_rate_snapshot = db.Column(db.Numeric(12, 6), default=1)
     original_currency_total = db.Column(db.Numeric(12, 2), default=0)
+    invoice_type = db.Column(db.String(30), default='Tax Invoice')
     sale_type = db.Column(db.String(10), default='Credit')  # Cash, Credit
     status = db.Column(db.String(20), default='Issued')  # Draft, Issued, Partially Paid, Paid, Overdue, Cancelled
     subtotal = db.Column(db.Numeric(12, 2), default=0)
@@ -36,6 +37,10 @@ class Sale(db.Model):
     irn_ack_dt = db.Column(db.DateTime)
     qr_code_data = db.Column(db.Text)
     e_invoice_status = db.Column(db.String(20), default='Pending')
+    razorpay_order_id = db.Column(db.String(100))
+    razorpay_payment_id = db.Column(db.String(100))
+    razorpay_signature = db.Column(db.String(255))
+    razorpay_verified_at = db.Column(db.DateTime)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     items = db.relationship('SaleItem', backref='sale', lazy='dynamic', cascade='all, delete-orphan')
@@ -79,6 +84,7 @@ class POSSession(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     session_no = db.Column(db.String(30), unique=True, nullable=False)
     opened_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    register_id = db.Column(db.Integer, db.ForeignKey('registers.id'), nullable=True)
     opened_at = db.Column(db.DateTime, default=datetime.utcnow)
     closed_at = db.Column(db.DateTime)
     opening_cash = db.Column(db.Numeric(12, 2), default=0)
@@ -87,8 +93,70 @@ class POSSession(db.Model):
     total_cash = db.Column(db.Numeric(12, 2), default=0)
     total_card = db.Column(db.Numeric(12, 2), default=0)
     total_upi = db.Column(db.Numeric(12, 2), default=0)
+    total_wallet = db.Column(db.Numeric(12, 2), default=0)
+    total_credit = db.Column(db.Numeric(12, 2), default=0)
+    total_refunds = db.Column(db.Numeric(12, 2), default=0)
+    cash_withdrawals = db.Column(db.Numeric(12, 2), default=0)
+    expected_closing_cash = db.Column(db.Numeric(12, 2), default=0)
+    cash_difference = db.Column(db.Numeric(12, 2), default=0)
     status = db.Column(db.String(20), default='Open')
     user = db.relationship('User', backref='pos_sessions', foreign_keys=[opened_by])
+    register = db.relationship('Register', backref='pos_sessions')
+
+
+class HeldBill(db.Model):
+    __tablename__ = 'held_bills'
+    id = db.Column(db.Integer, primary_key=True)
+    hold_no = db.Column(db.String(30), unique=True, nullable=False)
+    session_id = db.Column(db.Integer, db.ForeignKey('pos_sessions.id'), nullable=True)
+    customer_id = db.Column(db.Integer, db.ForeignKey('customers.id'), nullable=True)
+    warehouse_id = db.Column(db.Integer, db.ForeignKey('warehouses.id'), nullable=True)
+    cart_json = db.Column(db.Text, nullable=False)
+    notes = db.Column(db.String(255))
+    status = db.Column(db.String(20), default='Held')
+    created_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    session = db.relationship('POSSession', backref='held_bills')
+    customer = db.relationship('Customer', backref='held_bills')
+    warehouse = db.relationship('Warehouse', backref='held_bills')
+
+
+class SalesOrder(db.Model):
+    __tablename__ = 'sales_orders'
+    id = db.Column(db.Integer, primary_key=True)
+    order_no = db.Column(db.String(30), unique=True, nullable=False)
+    order_date = db.Column(db.Date, nullable=False)
+    customer_id = db.Column(db.Integer, db.ForeignKey('customers.id'), nullable=False)
+    warehouse_id = db.Column(db.Integer, db.ForeignKey('warehouses.id'), nullable=False)
+    expected_date = db.Column(db.Date)
+    status = db.Column(db.String(20), default='Draft')
+    subtotal = db.Column(db.Numeric(12, 2), default=0)
+    discount_total = db.Column(db.Numeric(12, 2), default=0)
+    tax_total = db.Column(db.Numeric(12, 2), default=0)
+    grand_total = db.Column(db.Numeric(12, 2), default=0)
+    notes = db.Column(db.Text)
+    created_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    customer = db.relationship('Customer', backref='sales_orders')
+    warehouse = db.relationship('Warehouse', backref='sales_orders')
+    items = db.relationship('SalesOrderItem', backref='sales_order', lazy='dynamic', cascade='all, delete-orphan')
+
+
+class SalesOrderItem(db.Model):
+    __tablename__ = 'sales_order_items'
+    id = db.Column(db.Integer, primary_key=True)
+    order_id = db.Column(db.Integer, db.ForeignKey('sales_orders.id', ondelete='CASCADE'), nullable=False)
+    product_id = db.Column(db.Integer, db.ForeignKey('products.id'), nullable=False)
+    quantity = db.Column(db.Numeric(12, 3), nullable=False)
+    rate = db.Column(db.Numeric(12, 4), nullable=False)
+    discount = db.Column(db.Numeric(5, 2), default=0)
+    tax_rate = db.Column(db.Numeric(5, 2), default=0)
+    tax_amount = db.Column(db.Numeric(12, 2), default=0)
+    line_total = db.Column(db.Numeric(12, 2), nullable=False)
+    fulfilled_qty = db.Column(db.Numeric(12, 3), default=0)
+    backorder_qty = db.Column(db.Numeric(12, 3), default=0)
+    product = db.relationship('Product', backref='sales_order_items')
 
 
 class RecurringInvoice(db.Model):
@@ -175,6 +243,8 @@ class SalesReturn(db.Model):
     tax_total = db.Column(db.Numeric(12, 2), default=0)
     grand_total = db.Column(db.Numeric(12, 2), default=0)
     reason = db.Column(db.Text)
+    restock = db.Column(db.Boolean, default=True)
+    status = db.Column(db.String(20), default='Approved')
     refund_mode = db.Column(db.String(20), default='Credit Note')
     notes = db.Column(db.Text)
     created_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
@@ -304,6 +374,79 @@ class DeliveryChallanItem(db.Model):
     product = db.relationship('Product', backref='challan_items')
 
 
+class DeliveryBill(db.Model):
+    __tablename__ = 'delivery_bills'
+    id = db.Column(db.Integer, primary_key=True)
+    delivery_no = db.Column(db.String(30), unique=True, nullable=False)
+    sale_id = db.Column(db.Integer, db.ForeignKey('sales.id'), nullable=True)
+    sales_order_id = db.Column(db.Integer, db.ForeignKey('sales_orders.id'), nullable=True)
+    customer_id = db.Column(db.Integer, db.ForeignKey('customers.id'), nullable=False)
+    delivery_status = db.Column(db.String(30), default='Pending')
+    delivery_address = db.Column(db.Text)
+    delivery_person = db.Column(db.String(120))
+    delivery_date = db.Column(db.Date)
+    remarks = db.Column(db.Text)
+    created_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    sale = db.relationship('Sale', backref='delivery_bills')
+    sales_order = db.relationship('SalesOrder', backref='delivery_bills')
+    customer = db.relationship('Customer', backref='delivery_bills')
+
+
+class Picklist(db.Model):
+    __tablename__ = 'picklists'
+    id = db.Column(db.Integer, primary_key=True)
+    picklist_no = db.Column(db.String(30), unique=True, nullable=False)
+    sale_id = db.Column(db.Integer, db.ForeignKey('sales.id'), nullable=True)
+    sales_order_id = db.Column(db.Integer, db.ForeignKey('sales_orders.id'), nullable=True)
+    warehouse_id = db.Column(db.Integer, db.ForeignKey('warehouses.id'), nullable=False)
+    status = db.Column(db.String(20), default='Open')
+    created_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    sale = db.relationship('Sale', backref='picklists')
+    sales_order = db.relationship('SalesOrder', backref='picklists')
+    warehouse = db.relationship('Warehouse', backref='picklists')
+    items = db.relationship('PicklistItem', backref='picklist', lazy='dynamic', cascade='all, delete-orphan')
+
+
+class PicklistItem(db.Model):
+    __tablename__ = 'picklist_items'
+    id = db.Column(db.Integer, primary_key=True)
+    picklist_id = db.Column(db.Integer, db.ForeignKey('picklists.id', ondelete='CASCADE'), nullable=False)
+    product_id = db.Column(db.Integer, db.ForeignKey('products.id'), nullable=False)
+    quantity = db.Column(db.Numeric(12, 3), nullable=False)
+    picked_qty = db.Column(db.Numeric(12, 3), default=0)
+    is_picked = db.Column(db.Boolean, default=False)
+    product = db.relationship('Product', backref='picklist_items')
+
+
+class Package(db.Model):
+    __tablename__ = 'packages'
+    id = db.Column(db.Integer, primary_key=True)
+    package_no = db.Column(db.String(30), unique=True, nullable=False)
+    picklist_id = db.Column(db.Integer, db.ForeignKey('picklists.id'), nullable=True)
+    sale_id = db.Column(db.Integer, db.ForeignKey('sales.id'), nullable=True)
+    customer_id = db.Column(db.Integer, db.ForeignKey('customers.id'), nullable=False)
+    status = db.Column(db.String(20), default='Packed')
+    weight = db.Column(db.Numeric(12, 3), default=0)
+    remarks = db.Column(db.Text)
+    created_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    picklist = db.relationship('Picklist', backref='packages')
+    sale = db.relationship('Sale', backref='packages')
+    customer = db.relationship('Customer', backref='packages')
+    items = db.relationship('PackageItem', backref='package', lazy='dynamic', cascade='all, delete-orphan')
+
+
+class PackageItem(db.Model):
+    __tablename__ = 'package_items'
+    id = db.Column(db.Integer, primary_key=True)
+    package_id = db.Column(db.Integer, db.ForeignKey('packages.id', ondelete='CASCADE'), nullable=False)
+    product_id = db.Column(db.Integer, db.ForeignKey('products.id'), nullable=False)
+    quantity = db.Column(db.Numeric(12, 3), nullable=False)
+    product = db.relationship('Product', backref='package_items')
+
+
 class CreditNote(db.Model):
     __tablename__ = 'credit_notes'
     id = db.Column(db.Integer, primary_key=True)
@@ -316,6 +459,8 @@ class CreditNote(db.Model):
     subtotal = db.Column(db.Numeric(12, 2), default=0)
     tax_total = db.Column(db.Numeric(12, 2), default=0)
     grand_total = db.Column(db.Numeric(12, 2), default=0)
+    applied_amount = db.Column(db.Numeric(12, 2), default=0)
+    refunded_amount = db.Column(db.Numeric(12, 2), default=0)
     status = db.Column(db.String(20), default='Draft')
     created_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)

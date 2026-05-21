@@ -1,35 +1,33 @@
 {% extends "base.html" %}
 {% block content %}
-<form class="panel mb-3" method="post">
+<form class="panel mb-3" method="post" novalidate>
   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
   <div class="form-grid">
     <div><label class="form-label">Product</label><select class="form-select" name="product_id" required>{% for p in products %}<option value="{{ p.id }}">{{ p.sku }} - {{ p.name }}</option>{% endfor %}</select></div>
-    <div><label class="form-label">Warehouse</label><select class="form-select" name="warehouse_id"><option value="">None</option>{% for w in warehouses %}<option value="{{ w.id }}">{{ w.name }}</option>{% endfor %}</select></div>
+    <div><label class="form-label">Warehouse</label><select class="form-select" name="warehouse_id" required>{% for w in warehouses %}<option value="{{ w.id }}">{{ w.name }}</option>{% endfor %}</select></div>
     <div><label class="form-label">Batch/Lot No</label><input class="form-control" name="batch_no" required></div>
-    <div><label class="form-label">Serial No</label><input class="form-control" name="serial_no"></div>
+    <div><label class="form-label">Purchase Reference</label><input class="form-control" name="purchase_reference"></div>
     <div><label class="form-label">Manufacture Date</label><input class="form-control" type="date" name="manufacture_date"></div>
     <div><label class="form-label">Expiry Date</label><input class="form-control" type="date" name="expiry_date"></div>
     <div><label class="form-label">Quantity</label><input class="form-control" type="number" step="0.001" name="quantity" value="0"></div>
-    <div><label class="form-label">Cost Rate</label><input class="form-control" type="number" step="0.0001" name="cost_rate" value="0"></div>
-    <div class="full"><label class="form-label">Notes</label><textarea class="form-control" name="notes"></textarea></div>
+    <div><label class="form-label">Cost</label><input class="form-control" type="number" step="0.0001" name="cost_rate" value="0"></div>
   </div>
   <button class="btn btn-primary mt-3"><i class="bi bi-save"></i> Save Batch</button>
 </form>
 
 <div class="panel">
-  <div class="d-flex justify-content-between mb-3">
-    <h2 class="h5 mb-0">Batch, Serial & Expiry Register</h2>
-  </div>
+  <h2 class="h5">Batch / Lot Register</h2>
   <table class="table datatable align-middle">
-    <thead><tr><th>Product</th><th>Warehouse</th><th>Batch</th><th>Serial</th><th>Qty</th><th>Expiry</th><th>Status</th></tr></thead>
+    <thead><tr><th>Product</th><th>Warehouse</th><th>Batch</th><th>Purchase Ref</th><th>Qty</th><th>Cost</th><th>Expiry</th><th>Status</th></tr></thead>
     <tbody>{% for batch in batches %}<tr>
       <td>{{ batch.product.sku }} - {{ batch.product.name }}</td>
       <td>{{ batch.warehouse.name if batch.warehouse }}</td>
       <td>{{ batch.batch_no }}</td>
-      <td>{{ batch.serial_no or '' }}</td>
+      <td>{{ batch.purchase_reference or '' }}</td>
       <td>{{ batch.quantity }}</td>
+      <td>{{ batch.cost }}</td>
       <td>{{ batch.expiry_date or '' }}</td>
-      <td><span class="badge text-bg-{{ 'danger' if batch.is_expired else 'light' }}">{{ 'Expired' if batch.is_expired else 'Open' }}</span></td>
+      <td>{{ batch.status }}</td>
     </tr>{% endfor %}</tbody>
   </table>
 </div>

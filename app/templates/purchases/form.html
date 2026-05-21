@@ -11,8 +11,19 @@
     <div><label class="form-label">Exchange Rate</label><input class="form-control" name="exchange_rate_snapshot" type="number" step="0.000001" value="1"></div>
     <div><label class="form-label">Supplier Invoice No</label><input class="form-control" name="supplier_invoice_no"></div>
     <div><label class="form-label">Supplier Invoice Date</label><input class="form-control" type="date" name="supplier_invoice_date"></div>
+    <div><label class="form-label">Due Date</label><input class="form-control" type="date" name="due_date"></div>
+    <div><label class="form-label">Status</label><select class="form-select" name="status"><option>Draft</option><option selected>Approved</option></select></div>
   </div>
   <hr><div class="d-flex justify-content-between"><h2 class="h6">Items</h2><button class="btn btn-sm btn-outline-primary" id="add-row" type="button"><i class="bi bi-plus-lg"></i></button></div><div id="items" class="mt-2"></div>
+  <div class="alert alert-info small mt-3">For batch/serial tracked items, enter matching line values below. Use comma or newline separated serial numbers.</div>
+  <div class="row g-2">
+    {% for n in range(5) %}
+    <div class="col-md-3"><input class="form-control" name="batch_no[]" placeholder="Batch no line {{ n + 1 }}"></div>
+    <div class="col-md-2"><input class="form-control" type="date" name="manufacture_date[]" title="MFG date"></div>
+    <div class="col-md-2"><input class="form-control" type="date" name="expiry_date[]" title="Expiry date"></div>
+    <div class="col-md-5"><input class="form-control" name="serial_numbers[]" placeholder="Serials line {{ n + 1 }}"></div>
+    {% endfor %}
+  </div>
   {% include "shared/totals.html" %}
   <label class="form-label mt-3">Notes</label><textarea class="form-control" name="notes"></textarea>
   <div class="sticky-actions d-flex justify-content-between align-items-center"><span class="text-muted">Review totals before saving.</span><button class="btn btn-primary">Save Purchase</button></div>

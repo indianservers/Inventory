@@ -1,9 +1,17 @@
 {% extends "base.html" %}
 {% block content %}
-<form class="panel" method="post" action="{{ url_for('pos.open_session') }}" style="max-width:520px">
+<form class="panel" method="post" action="{{ url_for('pos.open_session') }}" style="max-width:520px" novalidate>
   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
   <h2 class="h5">Open POS Session</h2>
-  <label class="form-label">Opening Cash</label><input class="form-control mb-3" name="opening_cash" type="number" step="0.01" value="0">
+  <label class="form-label">Register</label>
+  <select class="form-select mb-3" name="register_id">
+    <option value="">Default register</option>
+    {% for register in registers %}
+    <option value="{{ register.id }}">{{ register.name }} - {{ register.branch.name }} / {{ register.warehouse.name }}</option>
+    {% endfor %}
+  </select>
+  <label class="form-label">Opening Cash</label>
+  <input class="form-control mb-3" name="opening_cash" type="number" step="0.01" value="0" min="0">
   <button class="btn btn-success btn-lg w-100">Open Terminal</button>
 </form>
 {% endblock %}

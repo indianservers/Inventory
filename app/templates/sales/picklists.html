@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="row g-3">
+  <div class="col-lg-4">
+    <form class="panel" method="post" action="{{ url_for('sales.picklist_create') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <h2 class="h5">Create Picklist</h2>
+      <select class="form-select mb-2" name="sale_id"><option value="">From invoice</option>{% for s in sales %}<option value="{{ s.id }}">{{ s.invoice_no }} - {{ s.customer.name }}</option>{% endfor %}</select>
+      <select class="form-select mb-2" name="sales_order_id"><option value="">From sales order</option>{% for o in orders %}<option value="{{ o.id }}">{{ o.order_no }} - {{ o.customer.name }}</option>{% endfor %}</select>
+      <button class="btn btn-primary">Create</button>
+    </form>
+  </div>
+  <div class="col-lg-8">
+    <div class="panel"><table class="table datatable"><thead><tr><th>No</th><th>Warehouse</th><th>Source</th><th>Status</th><th>Items</th><th></th></tr></thead><tbody>{% for p in picklists %}<tr><td>{{ p.picklist_no }}</td><td>{{ p.warehouse.name }}</td><td>{{ p.sale.invoice_no if p.sale else (p.sales_order.order_no if p.sales_order else '') }}</td><td>{{ p.status }}</td><td>{{ p.items.count() }}</td><td><form method="post" action="{{ url_for('sales.picklist_mark_picked', id=p.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">{% for item in p.items %}<div class="input-group input-group-sm mb-1"><span class="input-group-text">{{ item.product.name }}</span><input class="form-control" name="picked_{{ item.id }}" type="number" step="0.001" value="{{ item.quantity }}"></div>{% endfor %}<button class="btn btn-sm btn-outline-success">Mark Picked</button></form></td></tr>{% endfor %}</tbody></table></div>
+  </div>
+</div>
+{% endblock %}

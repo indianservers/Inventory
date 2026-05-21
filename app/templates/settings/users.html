@@ -1,2 +1,22 @@
-{% extends "base.html" %}{% block content %}<div class="panel"><table class="table datatable"><thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th></tr></thead><tbody>{% for u in users %}<tr><td>{{ u.name }}</td><td>{{ u.email }}</td><td>{{ u.role.name }}</td><td>{{ 'Active' if u.is_active else 'Inactive' }}</td></tr>{% endfor %}</tbody></table></div>{% endblock %}
-
+{% extends "base.html" %}
+{% block content %}
+<div class="panel">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h2 class="h5 mb-0">Users</h2>
+    <div class="d-flex gap-2">
+      <form><select class="form-select form-select-sm" name="status" onchange="this.form.submit()">{% for key,label in [('all','All'),('active','Active'),('inactive','Inactive')] %}<option value="{{ key }}" {% if status == key %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></form>
+      <a class="btn btn-primary btn-sm" href="{{ url_for('settings.user_create') }}">Add User</a>
+    </div>
+  </div>
+  <table class="table datatable align-middle">
+    <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th></th></tr></thead>
+    <tbody>{% for u in users %}
+    <tr>
+      <td>{{ u.name }}</td><td>{{ u.email }}<br><small>{{ u.phone or '' }}</small></td><td>{{ u.role.name }}</td>
+      <td><span class="badge {{ 'text-bg-success' if u.is_active else 'text-bg-secondary' }}">{{ 'Active' if u.is_active else 'Inactive' }}</span></td>
+      <td class="text-end"><a class="btn btn-sm btn-outline-primary" href="{{ url_for('settings.user_edit', id=u.id) }}">Edit</a> {% if u.id != current_user.id %}<form class="d-inline" method="post" action="{{ url_for('settings.user_toggle', id=u.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn btn-sm btn-outline-secondary">{{ 'Deactivate' if u.is_active else 'Reactivate' }}</button></form>{% endif %}</td>
+    </tr>
+    {% endfor %}</tbody>
+  </table>
+</div>
+{% endblock %}

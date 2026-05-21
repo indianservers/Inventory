@@ -37,6 +37,8 @@
         {% endif %}
         <a class="btn btn-outline-secondary" href="{{ url_for('invoices.print_invoice', id=invoice.id) }}"><i class="bi bi-printer"></i> Print</a>
         <a class="btn btn-outline-primary" href="{{ url_for('invoices.pdf', id=invoice.id) }}"><i class="bi bi-filetype-pdf"></i> PDF</a>
+        <form method="post" action="{{ url_for('sales.sale_delivery_bill', id=invoice.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn btn-outline-primary w-100"><i class="bi bi-truck"></i> Create Delivery Bill</button></form>
+        <form method="post" action="{{ url_for('sales.picklist_create') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="sale_id" value="{{ invoice.id }}"><button class="btn btn-outline-secondary w-100"><i class="bi bi-clipboard-check"></i> Generate Picklist</button></form>
         {% if config.RAZORPAY_KEY_ID %}<button class="btn btn-outline-success" type="button" onclick="navigator.clipboard.writeText('{{ url_for('invoices.pay', id=invoice.id, _external=True) }}')"><i class="bi bi-link-45deg"></i> Send Payment Link</button><input class="form-control" readonly value="{{ url_for('invoices.pay', id=invoice.id, _external=True) }}">{% else %}<div class="alert alert-warning small">Set Razorpay keys to enable payment links.</div>{% endif %}
       </div>
     </div>

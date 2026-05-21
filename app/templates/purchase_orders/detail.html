@@ -12,6 +12,7 @@
     <div class="d-grid gap-2">
       <form method="post" action="{{ url_for('purchase_orders.send', id=po.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn btn-outline-primary w-100">Mark Sent</button></form>
       <a class="btn btn-success" href="{{ url_for('purchase_orders.grn_from_po', id=po.id) }}">Create GRN</a>
+      <form method="post" action="{{ url_for('purchase_orders.convert_bill', id=po.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn btn-primary w-100">Convert to Purchase Bill</button></form>
       <a class="btn btn-outline-secondary" href="{{ url_for('purchase_orders.print_po', id=po.id) }}">Print PO</a>
       <form method="post" action="{{ url_for('purchase_orders.cancel', id=po.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn btn-outline-danger w-100">Cancel PO</button></form>
     </div>

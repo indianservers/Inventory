@@ -1,16 +1,20 @@
 import csv
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from io import StringIO
 
-from flask import Blueprint, flash, redirect, render_template, request, url_for
+from flask import Blueprint, flash, redirect, render_template, request, send_file, url_for
 from flask_login import current_user, login_required
 
 from app.extensions import db
-from app.models import BankAccount, BankStatementLine, ChartOfAccounts, Customer, Expense, ExpenseCategory, JournalEntry, PaymentMade, PaymentReceived, Supplier, TCSEntry, TDSEntry, TDSSection
+from app.models import BankAccount, BankStatementLine, ChartOfAccounts, Customer, Expense, ExpenseCategory, ITCEntry, JournalEntry, PaymentAllocation, PaymentMade, PaymentReceived, Purchase, Sale, Supplier, SupplierLedger, TCSEntry, TDSEntry, TDSSection, VendorPaymentAllocation
 from app.services.accounting_service import create_journal, post_customer_receipt, post_supplier_payment
+from app.services.audit_service import record_audit
 from app.services.numbering_service import next_number
+from app.utils.helpers import money
+from app.utils.excel_export import export_to_excel
 
 bp = Blueprint("accounts", __name__, url_prefix="/accounts")
+XLSX_MIMETYPE = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 
 
 @bp.route("/chart")
@@ -23,6 +27,39 @@ def chart():
 @login_required
 def journals():
     return render_template("accounts/journals.html", title="Journal Entries", journals=JournalEntry.query.order_by(JournalEntry.id.desc()).all())
+
+
+@bp.route("/itc")
+@login_required
+def itc_register():
+    query = ITCEntry.query
+    if request.args.get("supplier_id"):
+        query = query.filter(ITCEntry.supplier_id == request.args["supplier_id"])
+    if request.args.get("status"):
+        query = query.filter(ITCEntry.itc_status == request.args["status"])
+    if request.args.get("period"):
+        query = query.filter(ITCEntry.claim_period == request.args["period"])
+    rows = query.order_by(ITCEntry.invoice_date.desc(), ITCEntry.id.desc()).all()
+    if request.args.get("export") == "xlsx":
+        output = export_to_excel(["Invoice", "Date", "Supplier", "Taxable", "CGST", "SGST", "IGST", "VAT", "Eligible", "Blocked", "Status", "Period"], [[r.invoice_no, r.invoice_date, r.supplier.name if r.supplier else "", r.taxable_value, r.input_tax_cgst, r.input_tax_sgst, r.input_tax_igst, r.input_tax_vat, r.eligible_itc_amount, r.blocked_itc_amount, r.itc_status, r.claim_period] for r in rows], "ITC Register")
+        return send_file(output, mimetype=XLSX_MIMETYPE, as_attachment=True, download_name="itc-register.xlsx")
+    return render_template("accounts/itc.html", title="ITC Register", rows=rows, suppliers=Supplier.query.order_by(Supplier.name).all())
+
+
+@bp.route("/itc/<int:id>/update", methods=["POST"])
+@login_required
+def itc_update(id):
+    entry = ITCEntry.query.get_or_404(id)
+    entry.itc_status = request.form.get("itc_status") or entry.itc_status
+    entry.blocked_itc_amount = request.form.get("blocked_itc_amount") or entry.blocked_itc_amount
+    entry.eligible_itc_amount = max(float(entry.input_tax_cgst or 0) + float(entry.input_tax_sgst or 0) + float(entry.input_tax_igst or 0) + float(entry.input_tax_vat or 0) - float(entry.blocked_itc_amount or 0), 0)
+    entry.ineligible_reason = request.form.get("ineligible_reason")
+    entry.reversal_reason = request.form.get("reversal_reason")
+    entry.remarks = request.form.get("remarks")
+    record_audit("Update", "ITCEntry", entry.id, new_data={"status": entry.itc_status})
+    db.session.commit()
+    flash("ITC entry updated.", "success")
+    return redirect(url_for("accounts.itc_register"))
 
 
 @bp.route("/journals/create", methods=["GET", "POST"])
@@ -44,20 +81,134 @@ def journal_create():
 @login_required
 def receipts():
     if request.method == "POST":
-        receipt = PaymentReceived(receipt_no=request.form.get("receipt_no") or next_number("receipt"), receipt_date=date.fromisoformat(request.form["receipt_date"]), customer_id=request.form["customer_id"], amount=request.form["amount"], payment_mode=request.form.get("payment_mode"), reference_no=request.form.get("reference_no"), notes=request.form.get("notes"), created_by=current_user.id)
-        db.session.add(receipt); db.session.flush(); post_customer_receipt(receipt, current_user.id); db.session.commit(); flash("Receipt saved.", "success")
+        amount = money(request.form["amount"])
+        receipt = PaymentReceived(receipt_no=request.form.get("receipt_no") or next_number("receipt"), receipt_date=date.fromisoformat(request.form["receipt_date"]), customer_id=request.form["customer_id"], amount=amount, unallocated_amount=amount, payment_mode=request.form.get("payment_mode"), reference_no=request.form.get("reference_no"), notes=request.form.get("notes"), created_by=current_user.id)
+        db.session.add(receipt); db.session.flush(); post_customer_receipt(receipt, current_user.id)
+        if request.form.get("sale_id"):
+            allocate_receipt_to_sale(receipt, Sale.query.get(request.form["sale_id"]), min(amount, receipt.unallocated_amount))
+        record_audit("Payment Update", "PaymentReceived", receipt.id, new_data={"receipt_no": receipt.receipt_no, "amount": str(receipt.amount)}); db.session.commit(); flash("Receipt saved.", "success")
         return redirect(url_for("accounts.receipts"))
-    return render_template("accounts/receipts.html", title="Receipts", items=PaymentReceived.query.order_by(PaymentReceived.id.desc()).all(), customers=Customer.query.all(), receipt_no=next_number("receipt"), today=date.today())
+    return render_template("accounts/receipts.html", title="Receipts", items=PaymentReceived.query.order_by(PaymentReceived.id.desc()).all(), customers=Customer.query.all(), invoices=Sale.query.filter(Sale.balance_amount > 0, Sale.status != "Cancelled").order_by(Sale.invoice_date.desc()).all(), receipt_no=next_number("receipt"), today=date.today())
+
+
+def allocate_receipt_to_sale(receipt, sale, amount):
+    if not sale or amount <= 0:
+        return
+    amount = min(money(amount), money(receipt.unallocated_amount), money(sale.balance_amount))
+    if amount <= 0:
+        return
+    db.session.add(PaymentAllocation(payment_id=receipt.id, sale_id=sale.id, amount=amount))
+    receipt.sale_id = receipt.sale_id or sale.id
+    receipt.unallocated_amount = money(receipt.unallocated_amount) - amount
+    sale.paid_amount = money(sale.paid_amount) + amount
+    sale.update_payment_status()
+
+
+@bp.route("/receipts/<int:id>/allocate", methods=["POST"])
+@login_required
+def receipt_allocate(id):
+    receipt = PaymentReceived.query.get_or_404(id)
+    try:
+        allocate_receipt_to_sale(receipt, Sale.query.get_or_404(request.form["sale_id"]), request.form.get("amount") or receipt.unallocated_amount)
+        record_audit("Payment Update", "PaymentReceived", receipt.id, new_data={"allocation": str(request.form.get("amount"))})
+        db.session.commit()
+        flash("Receipt allocated.", "success")
+    except Exception as exc:
+        db.session.rollback(); flash(str(exc), "danger")
+    return redirect(url_for("accounts.receipts"))
+
+
+@bp.route("/receipts/<int:id>/reverse", methods=["POST"])
+@login_required
+def receipt_reverse(id):
+    receipt = PaymentReceived.query.get_or_404(id)
+    if receipt.status == "Reversed":
+        flash("Receipt is already reversed.", "warning")
+        return redirect(url_for("accounts.receipts"))
+    try:
+        for allocation in receipt.allocations:
+            sale = allocation.sale
+            sale.paid_amount = max(0, money(sale.paid_amount) - money(allocation.amount))
+            sale.update_payment_status()
+        customer = Customer.query.get(receipt.customer_id)
+        customer.current_balance = money(customer.current_balance) + money(receipt.amount)
+        receipt.status = "Reversed"
+        receipt.reversed_at = datetime.utcnow()
+        receipt.reversal_reason = request.form.get("reason")
+        record_audit("Payment Update", "PaymentReceived", receipt.id, new_data={"status": "Reversed", "reason": receipt.reversal_reason})
+        db.session.commit()
+        flash("Receipt reversed. Review accounting journal reversal if required.", "success")
+    except Exception as exc:
+        db.session.rollback(); flash(str(exc), "danger")
+    return redirect(url_for("accounts.receipts"))
 
 
 @bp.route("/payments", methods=["GET", "POST"])
 @login_required
 def payments():
     if request.method == "POST":
-        payment = PaymentMade(voucher_no=request.form.get("voucher_no") or next_number("payment"), voucher_date=date.fromisoformat(request.form["voucher_date"]), payee_type=request.form.get("payee_type") or "Supplier", supplier_id=request.form.get("supplier_id") or None, amount=request.form["amount"], payment_mode=request.form.get("payment_mode"), reference_no=request.form.get("reference_no"), notes=request.form.get("notes"), created_by=current_user.id)
-        db.session.add(payment); db.session.flush(); post_supplier_payment(payment, current_user.id); db.session.commit(); flash("Payment saved.", "success")
+        amount = money(request.form["amount"])
+        payment = PaymentMade(voucher_no=request.form.get("voucher_no") or next_number("payment"), voucher_date=date.fromisoformat(request.form["voucher_date"]), payee_type=request.form.get("payee_type") or "Supplier", supplier_id=request.form.get("supplier_id") or None, amount=amount, unallocated_amount=amount, payment_mode=request.form.get("payment_mode"), reference_no=request.form.get("reference_no"), notes=request.form.get("notes"), created_by=current_user.id)
+        db.session.add(payment); db.session.flush(); post_supplier_payment(payment, current_user.id)
+        if request.form.get("purchase_id"):
+            allocate_payment_to_purchase(payment, Purchase.query.get(request.form["purchase_id"]), min(amount, payment.unallocated_amount))
+        record_audit("Payment Update", "PaymentMade", payment.id, new_data={"voucher_no": payment.voucher_no, "amount": str(payment.amount)}); db.session.commit(); flash("Payment saved.", "success")
         return redirect(url_for("accounts.payments"))
-    return render_template("accounts/payments.html", title="Payments", items=PaymentMade.query.order_by(PaymentMade.id.desc()).all(), suppliers=Supplier.query.all(), voucher_no=next_number("payment"), today=date.today())
+    return render_template("accounts/payments.html", title="Payments", items=PaymentMade.query.order_by(PaymentMade.id.desc()).all(), suppliers=Supplier.query.all(), purchases=Purchase.query.filter(Purchase.balance_amount > 0).order_by(Purchase.purchase_date.desc()).all(), voucher_no=next_number("payment"), today=date.today())
+
+
+def allocate_payment_to_purchase(payment, purchase, amount):
+    if not purchase or amount <= 0:
+        return
+    amount = min(money(amount), money(payment.unallocated_amount), money(purchase.balance_amount))
+    if amount <= 0:
+        return
+    db.session.add(VendorPaymentAllocation(payment_id=payment.id, purchase_id=purchase.id, amount=amount))
+    payment.purchase_id = payment.purchase_id or purchase.id
+    payment.unallocated_amount = money(payment.unallocated_amount) - amount
+    purchase.paid_amount = money(purchase.paid_amount) + amount
+    purchase.update_payment_status()
+
+
+@bp.route("/payments/<int:id>/allocate", methods=["POST"])
+@login_required
+def payment_allocate(id):
+    payment = PaymentMade.query.get_or_404(id)
+    try:
+        allocate_payment_to_purchase(payment, Purchase.query.get_or_404(request.form["purchase_id"]), request.form.get("amount") or payment.unallocated_amount)
+        record_audit("Payment Update", "PaymentMade", payment.id, new_data={"allocation": str(request.form.get("amount"))})
+        db.session.commit()
+        flash("Payment allocated.", "success")
+    except Exception as exc:
+        db.session.rollback(); flash(str(exc), "danger")
+    return redirect(url_for("accounts.payments"))
+
+
+@bp.route("/payments/<int:id>/reverse", methods=["POST"])
+@login_required
+def payment_reverse(id):
+    payment = PaymentMade.query.get_or_404(id)
+    if payment.status == "Reversed":
+        flash("Payment is already reversed.", "warning")
+        return redirect(url_for("accounts.payments"))
+    try:
+        for allocation in payment.allocations:
+            purchase = allocation.purchase
+            purchase.paid_amount = max(0, money(purchase.paid_amount) - money(allocation.amount))
+            purchase.update_payment_status()
+        supplier = Supplier.query.get(payment.supplier_id)
+        if supplier:
+            supplier.current_balance = money(supplier.current_balance) + money(payment.amount)
+            db.session.add(SupplierLedger(date=date.today(), supplier_id=supplier.id, reference_type="PaymentReversal", reference_id=payment.id, reference_no=payment.voucher_no, debit=0, credit=payment.amount, balance=supplier.outstanding + float(payment.amount), narration=request.form.get("reason") or "Vendor payment reversed"))
+        payment.status = "Reversed"
+        payment.reversed_at = datetime.utcnow()
+        payment.reversal_reason = request.form.get("reason")
+        record_audit("Payment Update", "PaymentMade", payment.id, new_data={"status": "Reversed", "reason": payment.reversal_reason})
+        db.session.commit()
+        flash("Payment reversed.", "success")
+    except Exception as exc:
+        db.session.rollback(); flash(str(exc), "danger")
+    return redirect(url_for("accounts.payments"))
 
 
 @bp.route("/expenses", methods=["GET", "POST"])

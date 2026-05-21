@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="panel">
+  <form method="post">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div class="row g-2 align-items-end mb-3 print-hide">
+      <div class="col-md-4"><label class="form-label">Supplier</label><select class="form-select" name="supplier_id" required><option value="">Choose supplier</option>{% for s in suppliers %}<option value="{{ s.id }}">{{ s.name }}</option>{% endfor %}</select></div>
+      <div class="col-md-4"><label class="form-label">Warehouse</label><select class="form-select" name="warehouse_id">{% for w in warehouses %}<option value="{{ w.id }}">{{ w.name }}</option>{% endfor %}</select></div>
+      <div class="col-md-4"><button class="btn btn-primary">Create Purchase Order</button></div>
+    </div>
+    <table class="table datatable align-middle">
+      <thead><tr><th></th><th>Product</th><th>Current</th><th>Reorder</th><th>Suggested Qty</th><th>Preferred Supplier</th><th>Last Rate</th><th>Warehouse</th></tr></thead>
+      <tbody>
+      {% for p in products %}
+        {% set suggested = (p.max_stock or p.reorder_level or 0) - (p.current_stock or 0) %}
+        <tr>
+          <td><input class="form-check-input" type="checkbox" name="product_id[]" value="{{ p.id }}"></td>
+          <td>{{ p.sku }}<br><strong>{{ p.name }}</strong></td><td>{{ p.current_stock }}</td><td>{{ p.reorder_level }}</td><td>{{ suggested if suggested > 0 else p.reorder_level }}</td><td>{{ p.preferred_supplier.name if p.preferred_supplier else 'Not set' }}</td><td>{{ p.purchase_price or p.average_cost }}</td><td>{{ p.warehouse.name if p.warehouse else '' }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </form>
+</div>
+{% endblock %}

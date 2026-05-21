@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block content %}
+<form class="panel" method="post" style="max-width:760px" novalidate>
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h2 class="h5 mb-0">Edit Branch</h2>
+    <a class="btn btn-outline-secondary" href="{{ url_for('settings.branches') }}">Back</a>
+  </div>
+  <div class="form-grid">
+    <div><label class="form-label">Branch Name</label><input class="form-control" name="name" value="{{ branch.name }}" required></div>
+    <div><label class="form-label">Branch Code</label><input class="form-control" name="code" value="{{ branch.code }}" required maxlength="20"></div>
+    <div class="full"><label class="form-label">Address</label><textarea class="form-control" name="address" rows="2">{{ branch.address or '' }}</textarea></div>
+    <div><label class="form-label">Contact Person</label><input class="form-control" name="contact_person" value="{{ branch.contact_person or '' }}"></div>
+    <div><label class="form-label">Phone</label><input class="form-control" name="phone" type="tel" value="{{ branch.phone or '' }}"></div>
+    <div><label class="form-label">Email</label><input class="form-control" name="email" type="email" value="{{ branch.email or '' }}"></div>
+    <div><label class="form-label">Tax Registration</label><input class="form-control" name="tax_number" value="{{ branch.tax_number or '' }}"></div>
+    <div class="full"><label class="form-check"><input class="form-check-input" type="checkbox" name="status" {% if branch.status %}checked{% endif %}> Active</label></div>
+  </div>
+  <button class="btn btn-primary mt-3">Save Branch</button>
+</form>
+{% endblock %}

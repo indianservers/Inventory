@@ -14,6 +14,10 @@ class Purchase(db.Model):
     original_currency_total = db.Column(db.Numeric(12, 2), default=0)
     supplier_invoice_no = db.Column(db.String(50))
     supplier_invoice_date = db.Column(db.Date)
+    due_date = db.Column(db.Date)
+    status = db.Column(db.String(20), default='Approved')
+    cancelled_at = db.Column(db.DateTime)
+    cancellation_reason = db.Column(db.Text)
     subtotal = db.Column(db.Numeric(12, 2), default=0)
     discount_total = db.Column(db.Numeric(12, 2), default=0)
     tax_total = db.Column(db.Numeric(12, 2), default=0)
@@ -84,6 +88,7 @@ class PurchaseReturn(db.Model):
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     items = db.relationship('PurchaseReturnItem', backref='purchase_return', lazy='dynamic', cascade='all, delete-orphan')
     purchase = db.relationship('Purchase', backref='returns')
+    supplier = db.relationship('Supplier', backref='purchase_returns')
     warehouse = db.relationship('Warehouse', backref='purchase_returns')
 
     def __repr__(self):
@@ -113,6 +118,7 @@ class PurchaseOrder(db.Model):
     expected_date = db.Column(db.Date)
     status = db.Column(db.String(20), default='Draft')
     subtotal = db.Column(db.Numeric(12, 2), default=0)
+    discount_total = db.Column(db.Numeric(12, 2), default=0)
     tax_total = db.Column(db.Numeric(12, 2), default=0)
     grand_total = db.Column(db.Numeric(12, 2), default=0)
     notes = db.Column(db.Text)
@@ -132,6 +138,8 @@ class PurchaseOrderItem(db.Model):
     product_id = db.Column(db.Integer, db.ForeignKey('products.id'), nullable=False)
     quantity = db.Column(db.Numeric(12, 3), nullable=False)
     rate = db.Column(db.Numeric(12, 4), nullable=False)
+    discount = db.Column(db.Numeric(5, 2), default=0)
+    discount_amount = db.Column(db.Numeric(12, 2), default=0)
     tax_rate = db.Column(db.Numeric(5, 2), default=0)
     tax_amount = db.Column(db.Numeric(12, 2), default=0)
     line_total = db.Column(db.Numeric(12, 2), nullable=False)
@@ -170,3 +178,39 @@ class GoodsReceiptItem(db.Model):
     line_total = db.Column(db.Numeric(12, 2), nullable=False)
     product = db.relationship('Product', backref='goods_receipt_items')
     po_item = db.relationship('PurchaseOrderItem', backref='goods_receipt_items')
+
+
+class VendorCredit(db.Model):
+    __tablename__ = 'vendor_credits'
+    id = db.Column(db.Integer, primary_key=True)
+    credit_no = db.Column(db.String(30), unique=True, nullable=False)
+    credit_date = db.Column(db.Date, nullable=False)
+    supplier_id = db.Column(db.Integer, db.ForeignKey('suppliers.id'), nullable=False)
+    purchase_id = db.Column(db.Integer, db.ForeignKey('purchases.id'), nullable=True)
+    purchase_return_id = db.Column(db.Integer, db.ForeignKey('purchase_returns.id'), nullable=True)
+    reason = db.Column(db.Text)
+    subtotal = db.Column(db.Numeric(12, 2), default=0)
+    tax_total = db.Column(db.Numeric(12, 2), default=0)
+    grand_total = db.Column(db.Numeric(12, 2), default=0)
+    applied_amount = db.Column(db.Numeric(12, 2), default=0)
+    refunded_amount = db.Column(db.Numeric(12, 2), default=0)
+    status = db.Column(db.String(20), default='Issued')
+    created_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    supplier = db.relationship('Supplier', backref='vendor_credits')
+    purchase = db.relationship('Purchase', backref='vendor_credits')
+    purchase_return = db.relationship('PurchaseReturn', backref='vendor_credits')
+    items = db.relationship('VendorCreditItem', backref='vendor_credit', lazy='dynamic', cascade='all, delete-orphan')
+
+
+class VendorCreditItem(db.Model):
+    __tablename__ = 'vendor_credit_items'
+    id = db.Column(db.Integer, primary_key=True)
+    vendor_credit_id = db.Column(db.Integer, db.ForeignKey('vendor_credits.id', ondelete='CASCADE'), nullable=False)
+    product_id = db.Column(db.Integer, db.ForeignKey('products.id'), nullable=False)
+    quantity = db.Column(db.Numeric(12, 3), nullable=False)
+    rate = db.Column(db.Numeric(12, 4), nullable=False)
+    tax_rate = db.Column(db.Numeric(5, 2), default=0)
+    tax_amount = db.Column(db.Numeric(12, 2), default=0)
+    line_total = db.Column(db.Numeric(12, 2), nullable=False)
+    product = db.relationship('Product', backref='vendor_credit_items')

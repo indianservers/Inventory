@@ -9,10 +9,11 @@ from werkzeug.security import generate_password_hash
 from werkzeug.utils import secure_filename
 
 from app.extensions import db
-from app.models import ApiToken, AppSetting, AuditLog, CompanySetting, Currency, ExchangeRateLog, Permission, PrintTemplate, Role, RolePermission, ScheduledReport, Tax, User
+from app.models import ApiToken, AppSetting, AuditLog, Branch, Company, CompanySetting, Currency, ExchangeRateLog, Permission, PrintTemplate, Register, Role, RolePermission, ScheduledReport, Tax, User, Warehouse
 from app.services.audit_service import record_audit
 from app.services.backup_service import backup_uploads
 from app.services.report_mailer import send_due_reports, send_report_now
+from app.utils.tax_validation import is_valid_gstin, is_valid_trn
 
 bp = Blueprint("settings", __name__, url_prefix="/settings")
 
@@ -20,14 +21,41 @@ bp = Blueprint("settings", __name__, url_prefix="/settings")
 @bp.route("/company", methods=["GET", "POST"])
 @login_required
 def company():
-    setting = CompanySetting.query.first() or CompanySetting()
+    company_row = Company.query.first()
+    setting = CompanySetting.query.first()
+    if not company_row:
+        company_row = Company()
+        if setting:
+            company_row.legal_name = setting.company_name
+            company_row.trade_name = setting.company_name
+            company_row.logo = setting.logo
+            company_row.address = setting.address
+            company_row.city = setting.city
+            company_row.state = setting.state
+            company_row.country = setting.country
+            company_row.postal_code = setting.postal_code
+            company_row.phone = setting.phone
+            company_row.email = setting.email
+            company_row.website = setting.website
+            company_row.tax_number = setting.tax_number
+            company_row.currency = setting.currency
+            company_row.financial_year_start_month = setting.financial_year_start.month if setting.financial_year_start else 4
+            company_row.invoice_prefix = setting.invoice_prefix
+            company_row.purchase_prefix = setting.purchase_prefix
+            company_row.quotation_prefix = setting.quotation_prefix
+            company_row.receipt_prefix = setting.receipt_prefix
+            company_row.payment_prefix = setting.payment_prefix
     if request.method == "POST":
-        for field in ["company_name","business_type","address","city","state","country","postal_code","phone","email","website","tax_number","pan_number","currency","invoice_prefix","purchase_prefix","quotation_prefix","receipt_prefix","payment_prefix","tax_mode","default_invoice_terms"]:
-            setattr(setting, field, request.form.get(field))
-        setting.enable_negative_stock = bool(request.form.get("enable_negative_stock"))
-        setting.enable_batch_tracking = bool(request.form.get("enable_batch_tracking"))
-        setting.enable_expiry_tracking = bool(request.form.get("enable_expiry_tracking"))
-        setting.enable_barcode = bool(request.form.get("enable_barcode"))
+        if not request.form.get("legal_name", "").strip():
+            flash("Company legal name is required.", "danger")
+            return redirect(url_for("settings.company"))
+        tax_number = request.form.get("tax_number")
+        if tax_number and not (is_valid_gstin(tax_number) or is_valid_trn(tax_number)):
+            flash("Invalid tax registration number. Enter a valid GSTIN or UAE TRN.", "danger")
+            return redirect(url_for("settings.company"))
+        for field in ["legal_name", "trade_name", "address", "city", "state", "country", "postal_code", "phone", "email", "website", "tax_number", "currency", "invoice_prefix", "purchase_prefix", "quotation_prefix", "receipt_prefix", "payment_prefix"]:
+            setattr(company_row, field, request.form.get(field))
+        company_row.financial_year_start_month = int(request.form.get("financial_year_start_month") or 4)
         logo = request.files.get("logo")
         if logo and logo.filename:
             extension = logo.filename.rsplit(".", 1)[-1].lower() if "." in logo.filename else ""
@@ -36,22 +64,274 @@ def company():
                 upload_dir.mkdir(parents=True, exist_ok=True)
                 filename = secure_filename(f"logo.{extension}")
                 logo.save(upload_dir / filename)
-                setting.logo = f"uploads/company/{filename}"
-        db.session.add(setting); db.session.commit(); flash("Company settings saved.", "success")
+                company_row.logo = f"uploads/company/{filename}"
+        db.session.add(company_row)
+        setting = _sync_company_setting(company_row, setting)
+        db.session.add(setting)
+        db.session.flush()
+        record_audit("Update", "Company", company_row.id, new_data={"legal_name": company_row.legal_name, "trade_name": company_row.trade_name})
+        db.session.commit(); flash("Company profile saved.", "success")
         return redirect(url_for("settings.company"))
-    return render_template("settings/company.html", title="Company Settings", setting=setting)
+    return render_template("settings/company.html", title="Company Profile", setting=company_row)
+
+
+@bp.route("/business-profile", methods=["GET", "POST"])
+@login_required
+def business_profile():
+    setting = CompanySetting.query.first()
+    if not setting:
+        setting = CompanySetting(company_name="Vyapara ERP")
+        db.session.add(setting)
+        db.session.flush()
+    profile_map = _business_profile_map()
+    if request.method == "POST":
+        business_type = request.form.get("business_type") or "Trading"
+        setting.business_type = business_type
+        selected = profile_map.get(business_type, profile_map["Custom"])
+        setting.enable_barcode = "Barcode" in selected["modules"]
+        setting.enable_batch_tracking = "Batch / Expiry" in selected["modules"]
+        setting.enable_expiry_tracking = "Batch / Expiry" in selected["modules"]
+        setting.enable_negative_stock = bool(request.form.get("enable_negative_stock"))
+        record_audit("Update", "Business Profile", setting.id, new_data={"business_type": business_type, "modules": selected["modules"]})
+        db.session.commit()
+        flash("Business profile saved. Module recommendations are now active for new workflows.", "success")
+        return redirect(url_for("settings.business_profile"))
+    return render_template("settings/business_profile.html", title="Business Profile", setting=setting, profiles=profile_map)
+
+
+def _business_profile_map():
+    return {
+        "Retail shop": {"modules": ["POS", "Barcode", "Inventory", "Loyalty"], "focus": "Fast billing, customer lookup and inventory accuracy."},
+        "Restaurant": {"modules": ["Tables", "KOT", "Modifiers", "Kitchen Screen", "Tips"], "focus": "Dine-in, takeaway, delivery and kitchen coordination."},
+        "Supermarket": {"modules": ["POS", "Barcode", "Weighing Scale", "Fast Checkout", "Batch / Expiry"], "focus": "High-volume scanning, price checks and quick checkout."},
+        "Pharmacy": {"modules": ["Batch / Expiry", "Prescription", "Controlled Medicine", "GST"], "focus": "Expiry, batch traceability and prescription capture."},
+        "Hardware": {"modules": ["Inventory", "Wholesale Pricing", "Credit Limit", "Stock Transfers"], "focus": "Bulk billing, heavy inventory and supplier replenishment."},
+        "Garments": {"modules": ["Variants", "Size / Color Matrix", "Barcode", "Promotions"], "focus": "Variant-rich catalog and seasonal pricing."},
+        "Electronics": {"modules": ["Serial Numbers", "Warranty", "Barcode", "Returns"], "focus": "Serial traceability, warranty and exchange flows."},
+        "Services": {"modules": ["Service Items", "Staff Assignment", "Appointments", "Receivables"], "focus": "Service billing and staff performance."},
+        "Trading": {"modules": ["Sales", "Purchases", "Inventory", "Accounting"], "focus": "End-to-end trading operations."},
+        "Wholesale": {"modules": ["Customer Price Lists", "Bulk Discount", "Credit Limit", "E-way Bill"], "focus": "Customer-specific pricing and credit control."},
+        "Manufacturing": {"modules": ["BOM", "Production Orders", "Raw Material Consumption", "Inventory"], "focus": "Assembly, material planning and production posting."},
+        "Custom": {"modules": ["POS", "Inventory", "Sales", "Purchases", "Accounting"], "focus": "Flexible configuration for mixed operations."},
+    }
 
 
 @bp.route("/users")
 @login_required
 def users():
-    return render_template("settings/users.html", title="Users & Roles", users=User.query.all(), roles=Role.query.all())
+    status = request.args.get("status", "all")
+    query = User.query.join(Role)
+    if status == "active":
+        query = query.filter(User.is_active.is_(True))
+    elif status == "inactive":
+        query = query.filter(User.is_active.is_(False))
+    return render_template("settings/users.html", title="Users", users=query.order_by(User.name).all(), roles=Role.query.order_by(Role.name).all(), status=status)
 
 
-@bp.route("/roles")
+@bp.route("/users/create", methods=["GET", "POST"])
+@login_required
+def user_create():
+    user = User(is_active=True)
+    return _user_form(user, "Create User")
+
+
+@bp.route("/users/<int:id>/edit", methods=["GET", "POST"])
+@login_required
+def user_edit(id):
+    return _user_form(User.query.get_or_404(id), "Edit User")
+
+
+@bp.route("/users/<int:id>/toggle", methods=["POST"])
+@login_required
+def user_toggle(id):
+    user = User.query.get_or_404(id)
+    if user.id == current_user.id:
+        flash("You cannot deactivate your own account.", "warning")
+        return redirect(url_for("settings.users"))
+    user.is_active = not user.is_active
+    record_audit("Update", "User", user.id, new_data={"is_active": user.is_active})
+    db.session.commit()
+    flash(f"{user.name} is now {'active' if user.is_active else 'inactive'}.", "success")
+    return redirect(url_for("settings.users"))
+
+
+@bp.route("/roles", methods=["GET", "POST"])
 @login_required
 def roles():
-    return render_template("settings/roles.html", title="Role Management", roles=Role.query.all(), permissions=Permission.query.all())
+    if request.method == "POST":
+        name = request.form.get("name", "").strip()
+        if not name:
+            flash("Role name is required.", "danger")
+            return redirect(url_for("settings.roles"))
+        if Role.query.filter(Role.name == name).first():
+            flash("Role name already exists.", "danger")
+            return redirect(url_for("settings.roles"))
+        role = Role(name=name, description=request.form.get("description"), is_system=False)
+        db.session.add(role)
+        db.session.flush()
+        for permission in Permission.query.all():
+            db.session.add(RolePermission(role_id=role.id, permission_id=permission.id, granted=False))
+        record_audit("Create", "Role", role.id, new_data={"name": role.name})
+        db.session.commit()
+        flash("Role created. Configure permissions next.", "success")
+        return redirect(url_for("settings.role_permissions", id=role.id))
+    return render_template("settings/roles.html", title="Roles & Permissions", roles=Role.query.order_by(Role.name).all(), permissions=Permission.query.order_by(Permission.module, Permission.action).all())
+
+
+@bp.route("/roles/<int:id>/edit", methods=["POST"])
+@login_required
+def role_edit(id):
+    role = Role.query.get_or_404(id)
+    role.description = request.form.get("description")
+    if not role.is_system:
+        name = request.form.get("name", "").strip()
+        if not name:
+            flash("Role name is required.", "danger")
+            return redirect(url_for("settings.roles"))
+        duplicate = Role.query.filter(Role.name == name, Role.id != role.id).first()
+        if duplicate:
+            flash("Role name already exists.", "danger")
+            return redirect(url_for("settings.roles"))
+        role.name = name
+    record_audit("Update", "Role", role.id, new_data={"name": role.name, "description": role.description})
+    db.session.commit()
+    flash("Role updated.", "success")
+    return redirect(url_for("settings.roles"))
+
+
+@bp.route("/branches", methods=["GET", "POST"])
+@login_required
+def branches():
+    if request.method == "POST":
+        branch = Branch()
+        ok = _save_branch(branch)
+        if ok:
+            db.session.add(branch)
+            db.session.flush()
+            record_audit("Create", "Branch", branch.id, new_data={"code": branch.code, "name": branch.name})
+            db.session.commit()
+            flash("Branch created.", "success")
+            return redirect(url_for("settings.branches"))
+    status = request.args.get("status", "all")
+    query = Branch.query
+    if status == "active":
+        query = query.filter(Branch.status.is_(True))
+    elif status == "inactive":
+        query = query.filter(Branch.status.is_(False))
+    return render_template("settings/branches.html", title="Branches", branches=query.order_by(Branch.name).all(), status=status)
+
+
+@bp.route("/branches/<int:id>/edit", methods=["GET", "POST"])
+@login_required
+def branch_edit(id):
+    branch = Branch.query.get_or_404(id)
+    if request.method == "POST" and _save_branch(branch):
+        record_audit("Update", "Branch", branch.id, new_data={"code": branch.code, "name": branch.name})
+        db.session.commit()
+        flash("Branch updated.", "success")
+        return redirect(url_for("settings.branches"))
+    return render_template("settings/branch_form.html", title="Edit Branch", branch=branch)
+
+
+@bp.route("/branches/<int:id>/toggle", methods=["POST"])
+@login_required
+def branch_toggle(id):
+    branch = Branch.query.get_or_404(id)
+    branch.status = not branch.status
+    record_audit("Update", "Branch", branch.id, new_data={"status": branch.status})
+    db.session.commit()
+    flash(f"Branch {'reactivated' if branch.status else 'deactivated'}.", "success")
+    return redirect(url_for("settings.branches"))
+
+
+@bp.route("/warehouses", methods=["GET", "POST"])
+@login_required
+def warehouses():
+    if request.method == "POST":
+        warehouse = Warehouse()
+        ok = _save_warehouse(warehouse)
+        if ok:
+            db.session.add(warehouse)
+            db.session.flush()
+            record_audit("Create", "Warehouse", warehouse.id, new_data={"code": warehouse.code, "name": warehouse.name})
+            db.session.commit()
+            flash("Warehouse created.", "success")
+            return redirect(url_for("settings.warehouses"))
+    status = request.args.get("status", "all")
+    query = Warehouse.query
+    if status == "active":
+        query = query.filter(Warehouse.status.is_(True))
+    elif status == "inactive":
+        query = query.filter(Warehouse.status.is_(False))
+    return render_template("settings/warehouses.html", title="Warehouses", warehouses=query.order_by(Warehouse.name).all(), branches=Branch.query.order_by(Branch.name).all(), status=status)
+
+
+@bp.route("/warehouses/<int:id>/edit", methods=["GET", "POST"])
+@login_required
+def warehouse_edit(id):
+    warehouse = Warehouse.query.get_or_404(id)
+    if request.method == "POST" and _save_warehouse(warehouse):
+        record_audit("Update", "Warehouse", warehouse.id, new_data={"code": warehouse.code, "name": warehouse.name})
+        db.session.commit()
+        flash("Warehouse updated.", "success")
+        return redirect(url_for("settings.warehouses"))
+    return render_template("settings/warehouse_form.html", title="Edit Warehouse", warehouse=warehouse, branches=Branch.query.order_by(Branch.name).all())
+
+
+@bp.route("/warehouses/<int:id>/toggle", methods=["POST"])
+@login_required
+def warehouse_toggle(id):
+    warehouse = Warehouse.query.get_or_404(id)
+    warehouse.status = not warehouse.status
+    record_audit("Update", "Warehouse", warehouse.id, new_data={"status": warehouse.status})
+    db.session.commit()
+    flash(f"Warehouse {'reactivated' if warehouse.status else 'deactivated'}.", "success")
+    return redirect(url_for("settings.warehouses"))
+
+
+@bp.route("/registers", methods=["GET", "POST"])
+@login_required
+def registers():
+    if request.method == "POST":
+        register = Register()
+        ok = _save_register(register)
+        if ok:
+            db.session.add(register)
+            db.session.flush()
+            record_audit("Create", "Register", register.id, new_data={"code": register.code, "name": register.name})
+            db.session.commit()
+            flash("POS register created.", "success")
+            return redirect(url_for("settings.registers"))
+    status = request.args.get("status", "all")
+    query = Register.query
+    if status == "active":
+        query = query.filter(Register.status.is_(True))
+    elif status == "inactive":
+        query = query.filter(Register.status.is_(False))
+    return render_template("settings/registers.html", title="POS Registers", registers=query.order_by(Register.name).all(), branches=Branch.query.order_by(Branch.name).all(), warehouses=Warehouse.query.order_by(Warehouse.name).all(), status=status)
+
+
+@bp.route("/registers/<int:id>/edit", methods=["GET", "POST"])
+@login_required
+def register_edit(id):
+    register = Register.query.get_or_404(id)
+    if request.method == "POST" and _save_register(register):
+        record_audit("Update", "Register", register.id, new_data={"code": register.code, "name": register.name})
+        db.session.commit()
+        flash("POS register updated.", "success")
+        return redirect(url_for("settings.registers"))
+    return render_template("settings/register_form.html", title="Edit POS Register", register=register, branches=Branch.query.order_by(Branch.name).all(), warehouses=Warehouse.query.order_by(Warehouse.name).all())
+
+
+@bp.route("/registers/<int:id>/toggle", methods=["POST"])
+@login_required
+def register_toggle(id):
+    register = Register.query.get_or_404(id)
+    register.status = not register.status
+    record_audit("Update", "Register", register.id, new_data={"status": register.status})
+    db.session.commit()
+    flash(f"POS register {'reactivated' if register.status else 'deactivated'}.", "success")
+    return redirect(url_for("settings.registers"))
 
 
 @bp.route("/roles/<int:id>/permissions", methods=["GET", "POST"])
@@ -264,6 +544,13 @@ def _template_form(template, title):
     if request.method == "POST":
         template.name = request.form["name"]
         template.template_type = request.form["template_type"]
+        template.module = request.form.get("module") or template.template_type
+        template.paper_size = request.form.get("paper_size") or "A4"
+        template.show_header = bool(request.form.get("show_header"))
+        template.show_footer = bool(request.form.get("show_footer"))
+        template.show_logo = bool(request.form.get("show_logo"))
+        template.column_config = request.form.get("column_config")
+        template.terms_conditions = request.form.get("terms_conditions")
         template.html = request.form.get("html")
         template.is_default = bool(request.form.get("is_default"))
         if template.is_default:
@@ -273,6 +560,120 @@ def _template_form(template, title):
         flash("Print template saved.", "success")
         return redirect(url_for("settings.templates"))
     return render_template("settings/template_editor.html", title=title, template=template, template_types=TEMPLATE_TYPES, variables=TEMPLATE_VARIABLES)
+
+
+def _sync_company_setting(company_row, setting=None):
+    setting = setting or CompanySetting()
+    setting.company_name = company_row.company_name
+    setting.logo = company_row.logo
+    setting.address = company_row.address
+    setting.city = company_row.city
+    setting.state = company_row.state
+    setting.country = company_row.country
+    setting.postal_code = company_row.postal_code
+    setting.phone = company_row.phone
+    setting.email = company_row.email
+    setting.website = company_row.website
+    setting.tax_number = company_row.tax_number
+    setting.currency = company_row.currency
+    if company_row.financial_year_start_month:
+        from datetime import date
+
+        setting.financial_year_start = date(date.today().year, company_row.financial_year_start_month, 1)
+    setting.invoice_prefix = company_row.invoice_prefix
+    setting.purchase_prefix = company_row.purchase_prefix
+    setting.quotation_prefix = company_row.quotation_prefix
+    setting.receipt_prefix = company_row.receipt_prefix
+    setting.payment_prefix = company_row.payment_prefix
+    return setting
+
+
+def _save_branch(branch):
+    branch.name = request.form.get("name", "").strip()
+    branch.code = request.form.get("code", "").strip().upper()
+    if not branch.name or not branch.code:
+        flash("Branch name and code are required.", "danger")
+        return False
+    duplicate = Branch.query.filter(Branch.code == branch.code, Branch.id != (branch.id or 0)).first()
+    if duplicate:
+        flash("Branch code already exists.", "danger")
+        return False
+    tax_number = request.form.get("tax_number")
+    if tax_number and not (is_valid_gstin(tax_number) or is_valid_trn(tax_number)):
+        flash("Invalid branch tax registration number. Enter a valid GSTIN or UAE TRN.", "danger")
+        return False
+    for field in ["address", "contact_person", "phone", "email", "tax_number"]:
+        setattr(branch, field, request.form.get(field))
+    branch.status = bool(request.form.get("status"))
+    return True
+
+
+def _save_warehouse(warehouse):
+    warehouse.name = request.form.get("name", "").strip()
+    warehouse.code = request.form.get("code", "").strip().upper()
+    if not warehouse.name or not warehouse.code:
+        flash("Warehouse name and code are required.", "danger")
+        return False
+    duplicate = Warehouse.query.filter(Warehouse.code == warehouse.code, Warehouse.id != (warehouse.id or 0)).first()
+    if duplicate:
+        flash("Warehouse code already exists.", "danger")
+        return False
+    warehouse.branch_id = request.form.get("branch_id") or None
+    for field in ["address", "contact_person", "phone", "email"]:
+        setattr(warehouse, field, request.form.get(field))
+    warehouse.status = bool(request.form.get("status"))
+    return True
+
+
+def _save_register(register):
+    register.name = request.form.get("name", "").strip()
+    register.code = request.form.get("code", "").strip().upper()
+    if not register.name or not register.code:
+        flash("Register name and code are required.", "danger")
+        return False
+    duplicate = Register.query.filter(Register.code == register.code, Register.id != (register.id or 0)).first()
+    if duplicate:
+        flash("Register code already exists.", "danger")
+        return False
+    register.branch_id = request.form.get("branch_id")
+    register.warehouse_id = request.form.get("warehouse_id")
+    if not register.branch_id or not register.warehouse_id:
+        flash("Register must be linked to a branch and warehouse.", "danger")
+        return False
+    register.receipt_printer = request.form.get("receipt_printer")
+    register.status = bool(request.form.get("status"))
+    return True
+
+
+def _user_form(user, title):
+    roles = Role.query.order_by(Role.name).all()
+    if request.method == "POST":
+        is_new = user.id is None
+        user.name = request.form.get("name", "").strip()
+        user.email = request.form.get("email", "").strip().lower()
+        user.phone = request.form.get("phone")
+        user.role_id = request.form.get("role_id")
+        user.is_active = bool(request.form.get("is_active"))
+        password = request.form.get("password", "")
+        if not user.name or not user.email or not user.role_id:
+            flash("Name, email and role are required.", "danger")
+            return render_template("settings/user_form.html", title=title, user=user, roles=roles)
+        duplicate = User.query.filter(User.email == user.email, User.id != (user.id or 0)).first()
+        if duplicate:
+            flash("A user with this email already exists.", "danger")
+            return render_template("settings/user_form.html", title=title, user=user, roles=roles)
+        if not user.id and not password:
+            flash("Password is required for new users.", "danger")
+            return render_template("settings/user_form.html", title=title, user=user, roles=roles)
+        if password:
+            user.set_password(password)
+        db.session.add(user)
+        db.session.flush()
+        record_audit("Create" if is_new else "Update", "User", user.id, new_data={"email": user.email, "role_id": user.role_id, "is_active": user.is_active})
+        db.session.commit()
+        flash("User saved.", "success")
+        return redirect(url_for("settings.users"))
+    return render_template("settings/user_form.html", title=title, user=user, roles=roles)
 
 
 def _sample_template_context():
@@ -287,6 +688,6 @@ def _sample_template_context():
     return {"company": company, "invoice": invoice, "sale": invoice, "items": items}
 
 
-TEMPLATE_TYPES = ["sales_invoice", "purchase_order", "delivery_challan", "quotation", "receipt", "credit_note"]
+TEMPLATE_TYPES = ["pos_receipt", "tax_invoice", "sales_invoice", "sales_order", "delivery_note", "delivery_challan", "credit_note", "refund_receipt", "purchase_order", "purchase_bill", "payment_receipt", "barcode_label", "packing_slip", "quotation", "receipt"]
 TEMPLATE_VARIABLES = ["company.company_name", "company.address", "invoice.invoice_no", "invoice.customer.name", "invoice.invoice_date", "invoice.grand_total", "items"]
 DEFAULT_TEMPLATE_HTML = """<div style="font-family:Arial,sans-serif"><h1>{{ company.company_name }}</h1><h2>Invoice {{ invoice.invoice_no }}</h2><p>{{ invoice.customer.name }}</p><table width="100%" border="1" cellspacing="0" cellpadding="6">{% for item in items %}<tr><td>{{ item.product.name }}</td><td>{{ item.quantity }}</td><td>{{ item.line_total }}</td></tr>{% endfor %}</table><h3>Total {{ invoice.grand_total }}</h3></div>"""

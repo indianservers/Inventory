@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="panel">
+  <div class="d-flex justify-content-between mb-3">
+    <h2 class="h5 mb-0">Vendor Credits</h2>
+    <a class="btn btn-primary" href="{{ url_for('purchases.return_create') }}">Create from Return</a>
+  </div>
+  <table class="table datatable">
+    <thead><tr><th>No</th><th>Date</th><th>Vendor</th><th>Total</th><th>Applied</th><th>Refunded</th><th>Status</th><th></th></tr></thead>
+    <tbody>
+      {% for c in credits %}
+      <tr>
+        <td>{{ c.credit_no }}</td><td>{{ c.credit_date }}</td><td>{{ c.supplier.name }}</td><td>{{ c.grand_total }}</td><td>{{ c.applied_amount }}</td><td>{{ c.refunded_amount }}</td><td>{{ c.status }}</td>
+        <td>
+          <form class="d-inline-flex gap-1" method="post" action="{{ url_for('purchases.vendor_credit_apply', id=c.id) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <select class="form-select form-select-sm" name="purchase_id" style="width:170px">{% for p in purchases if p.supplier_id == c.supplier_id %}<option value="{{ p.id }}">{{ p.purchase_no }}</option>{% endfor %}</select>
+            <input class="form-control form-control-sm" name="amount" type="number" step="0.01" placeholder="Amount" style="width:105px">
+            <button class="btn btn-sm btn-outline-success">Apply</button>
+          </form>
+          <form class="d-inline-flex gap-1" method="post" action="{{ url_for('purchases.vendor_credit_refund', id=c.id) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input class="form-control form-control-sm" name="amount" type="number" step="0.01" placeholder="Refund" style="width:105px">
+            <button class="btn btn-sm btn-outline-primary">Refund</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

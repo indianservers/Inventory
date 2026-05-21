@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="panel mb-3 print-hide">
+  <form class="row g-2 align-items-end">
+    <div class="col-md-3"><label class="form-label">Supplier</label><select class="form-select" name="supplier_id"><option value="">All</option>{% for s in suppliers %}<option value="{{ s.id }}" {% if request.args.get('supplier_id') == s.id|string %}selected{% endif %}>{{ s.name }}</option>{% endfor %}</select></div>
+    <div class="col-md-2"><label class="form-label">Period</label><input class="form-control" name="period" placeholder="YYYY-MM" value="{{ request.args.get('period','') }}"></div>
+    <div class="col-md-2"><label class="form-label">Status</label><select class="form-select" name="status"><option value="">All</option>{% for status in ["Eligible","Blocked","Reversed","Claimed"] %}<option {% if request.args.get('status') == status %}selected{% endif %}>{{ status }}</option>{% endfor %}</select></div>
+    <div class="col-md-5 d-flex gap-2"><button class="btn btn-primary">Filter</button><a class="btn btn-outline-success" href="{{ url_for('accounts.itc_register', supplier_id=request.args.get('supplier_id'), period=request.args.get('period'), status=request.args.get('status'), export='xlsx') }}">Export Excel</a><button class="btn btn-outline-secondary" type="button" onclick="window.print()">Print</button></div>
+  </form>
+</div>
+<div class="panel">
+  <table class="table table-sm datatable align-middle">
+    <thead><tr><th>Invoice</th><th>Date</th><th>Supplier</th><th>Taxable</th><th>CGST</th><th>SGST</th><th>IGST</th><th>Eligible</th><th>Blocked</th><th>Status</th><th class="print-hide">Action</th></tr></thead>
+    <tbody>
+    {% for row in rows %}
+      <tr>
+        <td>{{ row.invoice_no }}</td><td>{{ row.invoice_date }}</td><td>{{ row.supplier.name if row.supplier else '' }}</td><td>{{ row.taxable_value }}</td><td>{{ row.input_tax_cgst }}</td><td>{{ row.input_tax_sgst }}</td><td>{{ row.input_tax_igst }}</td><td>{{ row.eligible_itc_amount }}</td><td>{{ row.blocked_itc_amount }}</td><td><span class="badge text-bg-{{ 'success' if row.itc_status == 'Eligible' else 'warning' if row.itc_status == 'Claimed' else 'secondary' }}">{{ row.itc_status }}</span></td>
+        <td class="print-hide">
+          <form class="d-flex gap-1" method="post" action="{{ url_for('accounts.itc_update', id=row.id) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <select class="form-select form-select-sm" name="itc_status">{% for status in ["Eligible","Blocked","Reversed","Claimed"] %}<option {% if row.itc_status == status %}selected{% endif %}>{{ status }}</option>{% endfor %}</select>
+            <input class="form-control form-control-sm" name="blocked_itc_amount" placeholder="Blocked" value="{{ row.blocked_itc_amount or 0 }}">
+            <input class="form-control form-control-sm" name="ineligible_reason" placeholder="Reason">
+            <button class="btn btn-sm btn-primary">Save</button>
+          </form>
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

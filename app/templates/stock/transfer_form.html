@@ -7,6 +7,7 @@
     <div><label class="form-label">Date</label><input class="form-control" type="date" name="transfer_date" value="{{ today }}" required></div>
     <div><label class="form-label">From Warehouse</label><select class="form-select" name="from_warehouse_id" required>{% for w in warehouses %}<option value="{{ w.id }}">{{ w.name }}</option>{% endfor %}</select></div>
     <div><label class="form-label">To Warehouse</label><select class="form-select" name="to_warehouse_id" required>{% for w in warehouses %}<option value="{{ w.id }}">{{ w.name }}</option>{% endfor %}</select></div>
+    <div><label class="form-label">Status</label><select class="form-select" name="status"><option>Draft</option><option>Sent</option><option>Received</option></select></div>
     <div class="full"><label class="form-label">Notes</label><textarea class="form-control" name="notes"></textarea></div>
   </div>
   <hr>

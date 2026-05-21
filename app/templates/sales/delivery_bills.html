@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="panel">
+  <table class="table datatable">
+    <thead><tr><th>No</th><th>Customer</th><th>Source</th><th>Status</th><th>Address</th><th></th></tr></thead>
+    <tbody>{% for b in bills %}<tr><td>{{ b.delivery_no }}</td><td>{{ b.customer.name }}</td><td>{{ b.sale.invoice_no if b.sale else (b.sales_order.order_no if b.sales_order else '') }}</td><td>{{ b.delivery_status }}</td><td>{{ b.delivery_address }}</td><td><form class="d-flex gap-1" method="post" action="{{ url_for('sales.delivery_bill_status', id=b.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><select class="form-select form-select-sm" name="delivery_status"><option>Pending</option><option>Packed</option><option>Out for Delivery</option><option>Delivered</option><option>Cancelled</option></select><input class="form-control form-control-sm" type="date" name="delivery_date"><input class="form-control form-control-sm" name="delivery_person" placeholder="Person"><button class="btn btn-sm btn-outline-primary">Update</button></form></td></tr>{% endfor %}</tbody>
+  </table>
+</div>
+{% endblock %}

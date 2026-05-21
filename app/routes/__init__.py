@@ -17,6 +17,7 @@ def register_blueprints(app):
     from app.routes.accounts_routes import bp as accounts_bp
     from app.routes.reports_routes import bp as reports_bp
     from app.routes.settings_routes import bp as settings_bp
+    from app.routes.integration_routes import bp as integration_bp
     from app.routes.api_routes import bp as api_bp
     from app.routes.search_routes import bp as search_bp
 
@@ -39,6 +40,7 @@ def register_blueprints(app):
         accounts_bp,
         reports_bp,
         settings_bp,
+        integration_bp,
         api_bp,
         search_bp,
     ]:

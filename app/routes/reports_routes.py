@@ -3,13 +3,14 @@ import json
 from collections import defaultdict
 from datetime import date, timedelta
 from io import StringIO
+from xml.sax.saxutils import escape
 
 from flask import Blueprint, Response, render_template, request, send_file
-from flask_login import login_required
+from flask_login import current_user, login_required
 from sqlalchemy import extract, func
 
 from app.extensions import db
-from app.models import AccountGroup, ChartOfAccounts, CreditNote, CustomerLedger, Expense, InventoryLedger, PaymentMade, PaymentReceived, Product, ProductBatch, Purchase, Sale, SaleItem, SupplierLedger
+from app.models import AccountGroup, AuditLog, Batch, Branch, Category, ChartOfAccounts, CreditNote, Customer, CustomerLedger, Expense, ITCEntry, InventoryLedger, PaymentMade, PaymentReceived, POSSession, Product, ProductBatch, Purchase, PurchaseItem, PurchaseReturn, PurchaseReturnItem, Register, Sale, SaleItem, SalesReturn, SalesReturnItem, SerialNumber, Supplier, SupplierLedger, Tax, Warehouse
 from app.utils.excel_export import export_to_excel
 
 bp = Blueprint("reports", __name__, url_prefix="/reports")
@@ -20,6 +21,20 @@ XLSX_MIMETYPE = "application/vnd.openxmlformats-officedocument.spreadsheetml.she
 @login_required
 def index():
     return render_template("reports/index.html", title="Reports")
+
+
+@bp.route("/tally-export")
+@login_required
+def tally_export():
+    export_type = request.args.get("type", "sales")
+    start = parse_date_arg("start") or date.today().replace(day=1)
+    end = parse_date_arg("end") or date.today()
+    if request.args.get("download") == "xml":
+        xml = build_tally_xml(export_type, start, end)
+        db.session.add(AuditLog(user_id=current_user.id, action="Export", module="Tally", new_data=json.dumps({"type": export_type, "start": str(start), "end": str(end)})))
+        db.session.commit()
+        return Response(xml, mimetype="application/xml", headers={"Content-Disposition": f"attachment; filename=tally-{export_type}-{start}-{end}.xml"})
+    return render_template("reports/tally_export.html", title="Tally XML Export", export_type=export_type, start=start, end=end)
 
 
 @bp.route("/sales")
@@ -55,7 +70,12 @@ def stock_report():
 @bp.route("/low-stock")
 @login_required
 def low_stock_report():
-    products = Product.query.filter(Product.min_stock > 0, Product.current_stock <= Product.min_stock).order_by(Product.name).all()
+    query = Product.query.filter(Product.min_stock > 0, Product.current_stock <= Product.min_stock)
+    if request.args.get("warehouse_id"):
+        query = query.filter(Product.warehouse_id == request.args["warehouse_id"])
+    if request.args.get("category_id"):
+        query = query.filter(Product.category_id == request.args["category_id"])
+    products = query.order_by(Product.name).all()
     if request.args.get("export") == "xlsx":
         return stock_health_excel("low-stock.xlsx", "Low Stock", products)
     return render_template("reports/stock_health.html", title="Low Stock Report", products=products, mode="low")
@@ -73,7 +93,10 @@ def reorder_report():
 @bp.route("/valuation")
 @login_required
 def valuation_report():
-    products = Product.query.order_by(Product.name).all()
+    query = Product.query
+    if request.args.get("warehouse_id"):
+        query = query.filter(Product.warehouse_id == request.args["warehouse_id"])
+    products = query.order_by(Product.name).all()
     total_value = sum(product.stock_value for product in products)
     if request.args.get("export") == "xlsx":
         rows = [[p.sku, p.name, p.warehouse.name if p.warehouse else "", p.current_stock, p.average_cost, p.stock_value] for p in products]
@@ -85,7 +108,16 @@ def valuation_report():
 @login_required
 def expiry_report():
     alert_until = date.today() + timedelta(days=30)
-    batches = ProductBatch.query.filter(ProductBatch.expiry_date.isnot(None), ProductBatch.expiry_date <= alert_until).order_by(ProductBatch.expiry_date.asc()).all()
+    query = ProductBatch.query.filter(ProductBatch.expiry_date.isnot(None))
+    if request.args.get("date_from"):
+        query = query.filter(ProductBatch.expiry_date >= date.fromisoformat(request.args["date_from"]))
+    if request.args.get("date_to"):
+        query = query.filter(ProductBatch.expiry_date <= date.fromisoformat(request.args["date_to"]))
+    if not request.args.get("date_to"):
+        query = query.filter(ProductBatch.expiry_date <= alert_until)
+    if request.args.get("warehouse_id"):
+        query = query.filter(ProductBatch.warehouse_id == request.args["warehouse_id"])
+    batches = query.order_by(ProductBatch.expiry_date.asc()).all()
     if request.args.get("export") == "xlsx":
         rows = [[b.product.name, b.batch_no, b.expiry_date, b.quantity, b.warehouse.name if b.warehouse else ""] for b in batches]
         return excel_response("expiry-alerts.xlsx", "Expiry", ["Product", "Batch", "Expiry", "Qty", "Warehouse"], rows)
@@ -204,6 +236,51 @@ def gstr1_report():
     return render_template("reports/gstr1.html", title="GSTR-1", month=month, year=year, payload=payload, preview=preview)
 
 
+@bp.route("/gstr3b")
+@login_required
+def gstr3b_report():
+    month = int(request.args.get("month") or date.today().month)
+    year = int(request.args.get("year") or date.today().year)
+    quarter = request.args.get("quarter")
+    if quarter:
+        q = int(quarter)
+        months = [(q - 1) * 3 + 1, (q - 1) * 3 + 2, (q - 1) * 3 + 3]
+    else:
+        months = [month]
+    sales = Sale.query.filter(extract("year", Sale.invoice_date) == year, extract("month", Sale.invoice_date).in_(months), Sale.status.notin_(["Draft", "Cancelled"])).all()
+    purchases = Purchase.query.filter(extract("year", Purchase.purchase_date) == year, extract("month", Purchase.purchase_date).in_(months), Purchase.status != "Cancelled").all()
+    itc_entries = ITCEntry.query.filter(extract("year", ITCEntry.invoice_date) == year, extract("month", ITCEntry.invoice_date).in_(months)).all()
+    outward = sum(float(s.subtotal or 0) for s in sales)
+    outward_tax = sum(float(s.tax_total or 0) for s in sales)
+    exempt = sum(float(s.grand_total or 0) for s in sales if float(s.tax_total or 0) == 0)
+    inward_reverse_charge = 0
+    eligible_itc = sum(float(i.eligible_itc_amount or 0) for i in itc_entries if i.itc_status in {"Eligible", "Claimed"})
+    reversed_itc = sum(float(i.eligible_itc_amount or 0) for i in itc_entries if i.itc_status == "Reversed")
+    blocked_itc = sum(float(i.blocked_itc_amount or 0) for i in itc_entries)
+    net_itc = max(eligible_itc - reversed_itc, 0)
+    tax_payable = max(outward_tax - net_itc, 0)
+    summary = {
+        "outward_taxable_supplies": outward,
+        "zero_rated_supplies": 0,
+        "exempt_nil_non_gst": exempt,
+        "inward_reverse_charge": inward_reverse_charge,
+        "eligible_itc": eligible_itc,
+        "itc_reversed": reversed_itc,
+        "blocked_itc": blocked_itc,
+        "net_itc_available": net_itc,
+        "tax_payable": outward_tax,
+        "tax_paid_itc": min(outward_tax, net_itc),
+        "tax_paid_cash": tax_payable,
+        "interest_late_fee": 0,
+        "purchase_tax_total": sum(float(p.tax_total or 0) for p in purchases),
+    }
+    if request.args.get("export") == "xlsx":
+        return excel_response("gstr3b.xlsx", "GSTR-3B", ["Section", "Amount"], [[k.replace("_", " ").title(), v] for k, v in summary.items()])
+    if request.args.get("download") == "json":
+        return Response(json.dumps({"year": year, "months": months, "summary": summary}, indent=2), mimetype="application/json", headers={"Content-Disposition": f"attachment; filename=gstr3b-{year}.json"})
+    return render_template("reports/gstr3b.html", title="GSTR-3B", month=month, year=year, quarter=quarter, summary=summary)
+
+
 @bp.route("/abc-analysis")
 @login_required
 def abc_analysis():
@@ -270,6 +347,186 @@ def sales_velocity():
     return render_template("reports/sales_velocity.html", title="Sales Velocity", rows=rows)
 
 
+@bp.route("/sales-summary")
+@login_required
+def sales_summary():
+    query = Sale.query.filter(Sale.status.notin_(["Draft", "Cancelled"]))
+    query = date_filter(query, Sale.invoice_date)
+    if request.args.get("customer_id"):
+        query = query.filter(Sale.customer_id == request.args["customer_id"])
+    if request.args.get("branch_id"):
+        query = query.join(Warehouse).filter(Warehouse.branch_id == request.args["branch_id"])
+    rows = [{"Invoice": s.invoice_no, "Date": s.invoice_date, "Customer": s.customer.name, "Branch": s.warehouse.branch.name if s.warehouse and s.warehouse.branch else "", "Total": s.grand_total, "Paid": s.paid_amount, "Balance": s.balance_amount} for s in query.order_by(Sale.invoice_date.desc()).all()]
+    return report_response("Sales Summary", rows)
+
+
+@bp.route("/item-wise-sales")
+@login_required
+def item_wise_sales():
+    query = db.session.query(SaleItem).join(Sale).join(Product)
+    query = date_filter(query, Sale.invoice_date)
+    if request.args.get("category_id"):
+        query = query.filter(Product.category_id == request.args["category_id"])
+    if request.args.get("product_id"):
+        query = query.filter(SaleItem.product_id == request.args["product_id"])
+    rows = [{"Date": i.sale.invoice_date, "Invoice": i.sale.invoice_no, "Product": i.product.name, "Category": i.product.category.name if i.product.category else "", "Qty": i.quantity, "Rate": i.rate, "Tax": i.tax_amount, "Total": i.line_total} for i in query.order_by(Sale.invoice_date.desc()).all()]
+    return report_response("Item-wise Sales", rows)
+
+
+@bp.route("/customer-wise-sales")
+@login_required
+def customer_wise_sales():
+    query = db.session.query(Customer.name, func.coalesce(func.sum(Sale.grand_total), 0), func.count(Sale.id)).join(Sale).filter(Sale.status.notin_(["Draft", "Cancelled"]))
+    query = date_filter(query, Sale.invoice_date)
+    if request.args.get("customer_id"):
+        query = query.filter(Customer.id == request.args["customer_id"])
+    rows = [{"Customer": name, "Invoices": count, "Total Sales": total} for name, total, count in query.group_by(Customer.id, Customer.name).all()]
+    return report_response("Customer-wise Sales", rows)
+
+
+@bp.route("/sales-returns")
+@login_required
+def sales_return_report():
+    query = SalesReturn.query
+    query = date_filter(query, SalesReturn.return_date)
+    if request.args.get("customer_id"):
+        query = query.filter(SalesReturn.customer_id == request.args["customer_id"])
+    rows = [{"Return No": r.return_no, "Date": r.return_date, "Customer": r.sales_return_customer.name, "Restock": r.restock, "Status": r.status, "Total": r.grand_total} for r in query.order_by(SalesReturn.return_date.desc()).all()]
+    return report_response("Sales Return Report", rows)
+
+
+@bp.route("/payments-received")
+@login_required
+def payments_received_report():
+    query = PaymentReceived.query
+    query = date_filter(query, PaymentReceived.receipt_date)
+    if request.args.get("payment_mode"):
+        query = query.filter(PaymentReceived.payment_mode == request.args["payment_mode"])
+    rows = [{"Receipt": p.receipt_no, "Date": p.receipt_date, "Customer": p.customer.name, "Mode": p.payment_mode, "Amount": p.amount, "Unallocated": p.unallocated_amount, "Status": p.status} for p in query.order_by(PaymentReceived.receipt_date.desc()).all()]
+    return report_response("Payment Received Report", rows)
+
+
+@bp.route("/purchase-summary")
+@login_required
+def purchase_summary():
+    query = Purchase.query
+    query = date_filter(query, Purchase.purchase_date)
+    if request.args.get("vendor_id"):
+        query = query.filter(Purchase.supplier_id == request.args["vendor_id"])
+    rows = [{"Bill": p.purchase_no, "Date": p.purchase_date, "Vendor": p.supplier.name, "Vendor Bill": p.supplier_invoice_no, "Total": p.grand_total, "Paid": p.paid_amount, "Balance": p.balance_amount, "Status": p.status or p.payment_status} for p in query.order_by(Purchase.purchase_date.desc()).all()]
+    return report_response("Purchase Summary", rows)
+
+
+@bp.route("/vendor-wise-purchase")
+@login_required
+def vendor_wise_purchase():
+    query = db.session.query(Supplier.name, func.coalesce(func.sum(Purchase.grand_total), 0), func.count(Purchase.id)).join(Purchase)
+    query = date_filter(query, Purchase.purchase_date)
+    if request.args.get("vendor_id"):
+        query = query.filter(Supplier.id == request.args["vendor_id"])
+    rows = [{"Vendor": name, "Bills": count, "Total Purchases": total} for name, total, count in query.group_by(Supplier.id, Supplier.name).all()]
+    return report_response("Vendor-wise Purchase", rows)
+
+
+@bp.route("/purchase-returns")
+@login_required
+def purchase_return_report():
+    query = PurchaseReturn.query
+    query = date_filter(query, PurchaseReturn.return_date)
+    if request.args.get("vendor_id"):
+        query = query.filter(PurchaseReturn.supplier_id == request.args["vendor_id"])
+    rows = [{"Return No": r.return_no, "Date": r.return_date, "Vendor": r.supplier.name if hasattr(r, "supplier") and r.supplier else (r.purchase.supplier.name if r.purchase else ""), "Mode": r.refund_mode, "Total": r.grand_total} for r in query.order_by(PurchaseReturn.return_date.desc()).all()]
+    return report_response("Purchase Return Report", rows)
+
+
+@bp.route("/vendor-payments")
+@login_required
+def vendor_payment_report():
+    query = PaymentMade.query
+    query = date_filter(query, PaymentMade.voucher_date)
+    if request.args.get("vendor_id"):
+        query = query.filter(PaymentMade.supplier_id == request.args["vendor_id"])
+    if request.args.get("payment_mode"):
+        query = query.filter(PaymentMade.payment_mode == request.args["payment_mode"])
+    rows = [{"Voucher": p.voucher_no, "Date": p.voucher_date, "Vendor": p.supplier.name if p.supplier else "", "Mode": p.payment_mode, "Amount": p.amount, "Unallocated": p.unallocated_amount, "Status": p.status} for p in query.order_by(PaymentMade.voucher_date.desc()).all()]
+    return report_response("Vendor Payment Report", rows)
+
+
+@bp.route("/stock-summary")
+@login_required
+def stock_summary():
+    query = Product.query
+    if request.args.get("warehouse_id"):
+        query = query.filter(Product.warehouse_id == request.args["warehouse_id"])
+    if request.args.get("category_id"):
+        query = query.filter(Product.category_id == request.args["category_id"])
+    if request.args.get("product_id"):
+        query = query.filter(Product.id == request.args["product_id"])
+    rows = [{"SKU": p.sku, "Product": p.name, "Warehouse": p.warehouse.name if p.warehouse else "", "Category": p.category.name if p.category else "", "Stock": p.current_stock, "Avg Cost": p.average_cost, "Value": p.stock_value} for p in query.order_by(Product.name).all()]
+    return report_response("Stock Summary", rows)
+
+
+@bp.route("/stock-movement")
+@login_required
+def stock_movement_report():
+    query = InventoryLedger.query
+    query = date_filter(query, InventoryLedger.date)
+    if request.args.get("warehouse_id"):
+        query = query.filter(InventoryLedger.warehouse_id == request.args["warehouse_id"])
+    if request.args.get("product_id"):
+        query = query.filter(InventoryLedger.product_id == request.args["product_id"])
+    if request.args.get("transaction_type"):
+        query = query.filter(InventoryLedger.movement_type == request.args["transaction_type"])
+    rows = [{"Date": r.date, "Product": r.product.name, "Warehouse": r.warehouse.name if r.warehouse else "", "Type": r.movement_type, "Reference": r.reference_no, "In": r.qty_in, "Out": r.qty_out, "Balance": r.balance_qty} for r in query.order_by(InventoryLedger.date.desc(), InventoryLedger.id.desc()).all()]
+    return report_response("Stock Movement", rows)
+
+
+@bp.route("/serial-numbers")
+@login_required
+def serial_number_report():
+    query = SerialNumber.query
+    if request.args.get("product_id"):
+        query = query.filter(SerialNumber.product_id == request.args["product_id"])
+    if request.args.get("status"):
+        query = query.filter(SerialNumber.status == request.args["status"])
+    rows = [{"Product": s.product.name, "Serial": s.serial_no, "Status": s.status, "Warehouse": s.warehouse.name if s.warehouse else "", "Purchase": s.purchase_id, "Sale": s.sale_id} for s in query.order_by(SerialNumber.serial_no).all()]
+    return report_response("Serial Number Report", rows)
+
+
+@bp.route("/tax-report")
+@login_required
+def tax_report():
+    sales_rows = [{"Date": s.invoice_date, "Type": "Sale", "Reference": s.invoice_no, "Party": s.customer.name, "Tax": s.tax_total, "Total": s.grand_total} for s in date_filter(Sale.query, Sale.invoice_date).filter(Sale.tax_total != 0).all()]
+    purchase_rows = [{"Date": p.purchase_date, "Type": "Purchase", "Reference": p.purchase_no, "Party": p.supplier.name, "Tax": p.tax_total, "Total": p.grand_total} for p in date_filter(Purchase.query, Purchase.purchase_date).filter(Purchase.tax_total != 0).all()]
+    tx_type = request.args.get("transaction_type")
+    rows = sales_rows + purchase_rows
+    if tx_type:
+        rows = [row for row in rows if row["Type"].lower() == tx_type.lower()]
+    return report_response("Tax Report", rows)
+
+
+@bp.route("/cashier-closing")
+@login_required
+def cashier_closing_report():
+    query = POSSession.query
+    if request.args.get("date_from"):
+        query = query.filter(POSSession.opened_at >= request.args["date_from"])
+    rows = [{"Session": s.session_no, "Opened": s.opened_at, "Closed": s.closed_at, "Cash": s.total_cash, "Card": s.total_card, "UPI": s.total_upi, "Expected": s.expected_closing_cash, "Closing": s.closing_cash, "Difference": s.cash_difference, "Status": s.status} for s in query.order_by(POSSession.id.desc()).all()]
+    return report_response("Cashier Closing Report", rows)
+
+
+@bp.route("/activity-log")
+@login_required
+def activity_log_report():
+    query = AuditLog.query
+    if request.args.get("date_from"):
+        query = query.filter(AuditLog.created_at >= request.args["date_from"])
+    if request.args.get("action"):
+        query = query.filter(AuditLog.action == request.args["action"])
+    rows = [{"Date": a.created_at, "User": a.user.name if a.user else "", "Action": a.action, "Module": a.module, "Reference": a.record_id, "IP": a.ip_address} for a in query.order_by(AuditLog.id.desc()).all()]
+    return report_response("Activity Log Report", rows)
+
+
 def build_gstr1_payload(sales, month, year):
     b2b_map = {}
     b2c_summary = defaultdict(lambda: {"txval": 0, "iamt": 0, "camt": 0, "samt": 0, "csamt": 0, "val": 0})
@@ -331,6 +588,71 @@ def gstr1_csv(rows):
 def excel_response(filename, sheet_name, headers, rows):
     output = export_to_excel(headers, rows, sheet_name)
     return send_file(output, mimetype=XLSX_MIMETYPE, as_attachment=True, download_name=filename)
+
+
+def parse_date_arg(name):
+    value = request.args.get(name)
+    if not value:
+        return None
+    try:
+        return date.fromisoformat(value)
+    except ValueError:
+        return None
+
+
+def build_tally_xml(export_type, start, end):
+    vouchers = []
+    if export_type == "purchases":
+        for purchase in Purchase.query.filter(Purchase.purchase_date >= start, Purchase.purchase_date <= end).order_by(Purchase.purchase_date).all():
+            vouchers.append(_tally_voucher("Purchase", purchase.purchase_date, purchase.purchase_no, purchase.supplier.name if purchase.supplier else "Supplier", purchase.grand_total))
+    elif export_type == "receipts":
+        for receipt in PaymentReceived.query.filter(PaymentReceived.payment_date >= start, PaymentReceived.payment_date <= end).order_by(PaymentReceived.payment_date).all():
+            vouchers.append(_tally_voucher("Receipt", receipt.payment_date, receipt.receipt_no, receipt.customer.name if receipt.customer else "Customer", receipt.amount))
+    elif export_type == "payments":
+        for payment in PaymentMade.query.filter(PaymentMade.payment_date >= start, PaymentMade.payment_date <= end).order_by(PaymentMade.payment_date).all():
+            vouchers.append(_tally_voucher("Payment", payment.payment_date, payment.payment_no, payment.supplier.name if payment.supplier else "Supplier", payment.amount))
+    elif export_type == "stock_items":
+        for product in Product.query.order_by(Product.name).all():
+            vouchers.append(f"<STOCKITEM NAME=\"{escape(product.name or '')}\"><BASEUNITS>{escape(product.unit.symbol if product.unit else 'Nos')}</BASEUNITS><OPENINGBALANCE>{float(product.current_stock or 0):.3f}</OPENINGBALANCE><OPENINGVALUE>{float(product.stock_value or 0):.2f}</OPENINGVALUE></STOCKITEM>")
+    elif export_type == "customers":
+        for customer in Customer.query.order_by(Customer.name).all():
+            vouchers.append(f"<LEDGER NAME=\"{escape(customer.name or '')}\"><PARENT>Sundry Debtors</PARENT><GSTIN>{escape(customer.gstin or '')}</GSTIN></LEDGER>")
+    elif export_type == "suppliers":
+        for supplier in Supplier.query.order_by(Supplier.name).all():
+            vouchers.append(f"<LEDGER NAME=\"{escape(supplier.name or '')}\"><PARENT>Sundry Creditors</PARENT><GSTIN>{escape(supplier.gstin or '')}</GSTIN></LEDGER>")
+    else:
+        for sale in Sale.query.filter(Sale.invoice_date >= start, Sale.invoice_date <= end, Sale.status != "Cancelled").order_by(Sale.invoice_date).all():
+            vouchers.append(_tally_voucher("Sales", sale.invoice_date, sale.invoice_no, sale.customer.name if sale.customer else "Customer", sale.grand_total))
+    body = "".join(vouchers)
+    return f"""<?xml version=\"1.0\" encoding=\"UTF-8\"?>
+<ENVELOPE><HEADER><TALLYREQUEST>Import Data</TALLYREQUEST></HEADER><BODY><IMPORTDATA><REQUESTDESC><REPORTNAME>Vouchers</REPORTNAME></REQUESTDESC><REQUESTDATA>{body}</REQUESTDATA></IMPORTDATA></BODY></ENVELOPE>"""
+
+
+def _tally_voucher(voucher_type, txn_date, voucher_no, party, amount):
+    amount = float(amount or 0)
+    ymd = txn_date.strftime("%Y%m%d") if txn_date else ""
+    return (
+        f"<TALLYMESSAGE><VOUCHER VCHTYPE=\"{escape(voucher_type)}\" ACTION=\"Create\">"
+        f"<DATE>{ymd}</DATE><VOUCHERTYPENAME>{escape(voucher_type)}</VOUCHERTYPENAME>"
+        f"<VOUCHERNUMBER>{escape(voucher_no or '')}</VOUCHERNUMBER><PARTYLEDGERNAME>{escape(party or '')}</PARTYLEDGERNAME>"
+        f"<ALLLEDGERENTRIES.LIST><LEDGERNAME>{escape(party or '')}</LEDGERNAME><AMOUNT>{amount:.2f}</AMOUNT></ALLLEDGERENTRIES.LIST>"
+        f"</VOUCHER></TALLYMESSAGE>"
+    )
+
+
+def report_response(title, rows):
+    headers = list(rows[0].keys()) if rows else []
+    if request.args.get("export") == "xlsx":
+        return excel_response(f"{title.lower().replace(' ', '-')}.xlsx", title[:31], headers, [[row.get(header) for header in headers] for row in rows])
+    return render_template("reports/custom_table.html", title=title, headers=headers, rows=rows)
+
+
+def date_filter(query, column):
+    if request.args.get("date_from"):
+        query = query.filter(column >= date.fromisoformat(request.args["date_from"]))
+    if request.args.get("date_to"):
+        query = query.filter(column <= date.fromisoformat(request.args["date_to"]))
+    return query
 
 
 def aging_excel(filename, sheet_name, rows):

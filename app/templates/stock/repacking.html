@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="row g-3">
+  <div class="col-lg-5">
+    <form class="panel" method="post" novalidate>
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <h2 class="h5">Item Repacking</h2>
+      <label class="form-label">Repack No</label><input class="form-control mb-2" name="repack_no" value="{{ repack_no }}">
+      <label class="form-label">Date</label><input class="form-control mb-2" type="date" name="repack_date" value="{{ today }}" required>
+      <label class="form-label">Warehouse</label><select class="form-select mb-2" name="warehouse_id" required>{% for warehouse in warehouses %}<option value="{{ warehouse.id }}">{{ warehouse.name }}</option>{% endfor %}</select>
+      <div id="repack-lines">
+        {% for typ in ['Input','Output'] %}
+        <div class="row g-2 repack-line mb-2">
+          <div class="col-2"><select class="form-select" name="line_type[]"><option {% if typ == 'Input' %}selected{% endif %}>Input</option><option {% if typ == 'Output' %}selected{% endif %}>Output</option></select></div>
+          <div class="col-5"><select class="form-select" name="product_id[]" required>{% for product in products %}<option value="{{ product.id }}">{{ product.sku }} - {{ product.name }}</option>{% endfor %}</select></div>
+          <div class="col-3"><input class="form-control" name="quantity[]" type="number" step="0.001" min="0.001" placeholder="Qty" required></div>
+          <div class="col-2"><input class="form-control" name="rate[]" type="number" step="0.0001" placeholder="Rate"></div>
+        </div>
+        {% endfor %}
+      </div>
+      <label class="form-label">Notes</label><textarea class="form-control mb-3" name="notes"></textarea>
+      <div class="d-flex gap-2"><button class="btn btn-outline-secondary" type="button" id="add-repack-line">Line</button><button class="btn btn-primary">Post Repacking</button></div>
+    </form>
+  </div>
+  <div class="col-lg-7">
+    <div class="panel">
+      <h2 class="h5">Repacking Log</h2>
+      <table class="table datatable align-middle">
+        <thead><tr><th>No</th><th>Date</th><th>Warehouse</th><th>Status</th><th>Lines</th></tr></thead>
+        <tbody>{% for tx in transactions %}<tr><td>{{ tx.repack_no }}</td><td>{{ tx.repack_date }}</td><td>{{ tx.warehouse.name }}</td><td>{{ tx.status }}</td><td>{{ tx.items.count() }}</td></tr>{% endfor %}</tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+document.getElementById("add-repack-line")?.addEventListener("click", () => {
+  const line = document.querySelector(".repack-line").cloneNode(true);
+  line.querySelectorAll("input").forEach((input) => input.value = "");
+  document.getElementById("repack-lines").appendChild(line);
+});
+</script>
+{% endblock %}

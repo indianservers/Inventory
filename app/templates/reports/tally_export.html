@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="panel">
+  <div class="d-flex flex-wrap justify-content-between gap-2 align-items-center mb-3">
+    <div>
+      <h2 class="h5 mb-1">Tally XML Export</h2>
+      <small class="text-muted">Export real vouchers and masters in Tally-compatible XML.</small>
+    </div>
+  </div>
+  <form class="row g-3 align-items-end" method="get">
+    <div class="col-md-3">
+      <label class="form-label">Export Type</label>
+      <select class="form-select" name="type">
+        {% for value,label in [("sales","Sales Vouchers"),("purchases","Purchase Vouchers"),("receipts","Receipt Vouchers"),("payments","Payment Vouchers"),("stock_items","Stock Items"),("customers","Customer Ledgers"),("suppliers","Supplier Ledgers")] %}
+          <option value="{{ value }}" {% if export_type == value %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-md-3">
+      <label class="form-label">Start Date</label>
+      <input class="form-control" type="date" name="start" value="{{ start }}">
+    </div>
+    <div class="col-md-3">
+      <label class="form-label">End Date</label>
+      <input class="form-control" type="date" name="end" value="{{ end }}">
+    </div>
+    <div class="col-md-3 d-flex gap-2">
+      <button class="btn btn-outline-primary flex-fill">Preview</button>
+      <button class="btn btn-primary flex-fill" name="download" value="xml">Download XML</button>
+    </div>
+  </form>
+</div>
+{% endblock %}

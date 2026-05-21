@@ -8,8 +8,9 @@ from flask import Blueprint, Response, flash, redirect, render_template, request
 from flask_login import current_user, login_required
 
 from app.extensions import db
-from app.models import Currency, Purchase, PurchaseItem, PurchaseReturn, PurchaseReturnItem, Supplier, SupplierLedger, TDSEntry, Warehouse
-from app.services.accounting_service import post_purchase
+from app.models import Batch, Currency, ITCEntry, Purchase, PurchaseItem, PurchaseReturn, PurchaseReturnItem, SerialNumber, Supplier, SupplierLedger, TDSEntry, VendorCredit, VendorCreditItem, Warehouse
+from app.services.accounting_service import account, create_journal, post_purchase
+from app.services.audit_service import record_audit
 from app.services.invoice_service import calculate_document, line_totals
 from app.services.numbering_service import next_number
 from app.services.stock_service import apply_purchase_item, apply_purchase_return_item
@@ -65,18 +66,74 @@ def create():
                     for key in ["rate", "gross", "discount_amount", "tax_amount", "line_total"]:
                         item[key] = float(item[key] or 0) * exchange_rate
             purchase = Purchase(purchase_no=request.form.get("purchase_no") or next_number("purchases"), purchase_date=date.fromisoformat(request.form["purchase_date"]), supplier_id=request.form["supplier_id"], warehouse_id=request.form["warehouse_id"], currency_id=currency.id if currency else None, exchange_rate_snapshot=exchange_rate, original_currency_total=original_total, supplier_invoice_no=request.form.get("supplier_invoice_no"), supplier_invoice_date=date.fromisoformat(request.form["supplier_invoice_date"]) if request.form.get("supplier_invoice_date") else None, notes=request.form.get("notes"), created_by=current_user.id, **totals)
+            purchase.due_date = date.fromisoformat(request.form["due_date"]) if request.form.get("due_date") else purchase.purchase_date
+            purchase.status = request.form.get("status") or "Approved"
+            purchase.update_payment_status()
             db.session.add(purchase); db.session.flush()
             apply_purchase_tds(purchase)
-            for item in items:
+            for index, item in enumerate(items):
                 db.session.add(PurchaseItem(purchase_id=purchase.id, product_id=item["product_id"], quantity=item["quantity"], rate=item["rate"], discount=item["discount"], discount_amount=item["discount_amount"], tax_rate=item["tax_rate"], tax_amount=item["tax_amount"], line_total=item["line_total"]))
-                apply_purchase_item(item["product_id"], purchase.warehouse_id, item["quantity"], item["rate"], purchase.id, purchase.purchase_no)
-            post_purchase(purchase, current_user.id)
+                if purchase.status != "Draft":
+                    apply_purchase_item(item["product_id"], purchase.warehouse_id, item["quantity"], item["rate"], purchase.id, purchase.purchase_no)
+                    capture_purchase_tracking(index, item["product_id"], purchase.warehouse_id, item["quantity"], item["rate"], purchase.id, purchase.purchase_no)
+            if purchase.status != "Draft":
+                post_purchase(purchase, current_user.id)
+                create_or_update_itc_entry(purchase)
+            record_audit("Create", "Purchase", purchase.id, new_data={"purchase_no": purchase.purchase_no})
             db.session.commit()
             flash("Purchase saved and stock updated.", "success")
             return redirect(url_for("purchases.index"))
         except Exception as exc:
             db.session.rollback(); flash(str(exc), "danger")
     return render_template("purchases/form.html", title="Create Purchase", purchase=None, suppliers=Supplier.query.all(), warehouses=Warehouse.query.all(), currencies=Currency.query.order_by(Currency.code).all(), today=date.today(), purchase_no=next_number("purchases"))
+
+
+@bp.route("/<int:id>/approve", methods=["POST"])
+@login_required
+def approve_purchase(id):
+    purchase = Purchase.query.get_or_404(id)
+    if purchase.status != "Draft":
+        flash("Only draft purchases can be approved.", "warning")
+        return redirect(url_for("purchases.index"))
+    try:
+        for item in purchase.items:
+            apply_purchase_item(item.product_id, purchase.warehouse_id, item.quantity, item.rate, purchase.id, purchase.purchase_no)
+        purchase.status = "Approved"
+        post_purchase(purchase, current_user.id)
+        create_or_update_itc_entry(purchase)
+        record_audit("Update", "Purchase", purchase.id, new_data={"status": "Approved"})
+        db.session.commit()
+        flash("Purchase approved and stock updated.", "success")
+    except Exception as exc:
+        db.session.rollback(); flash(str(exc), "danger")
+    return redirect(url_for("purchases.index"))
+
+
+@bp.route("/<int:id>/cancel", methods=["POST"])
+@login_required
+def cancel_purchase(id):
+    purchase = Purchase.query.get_or_404(id)
+    if purchase.status == "Cancelled":
+        flash("Purchase is already cancelled.", "warning")
+        return redirect(url_for("purchases.index"))
+    if float(purchase.paid_amount or 0) > 0:
+        flash("Reverse vendor payments before cancelling a paid purchase.", "warning")
+        return redirect(url_for("purchases.index"))
+    try:
+        for item in purchase.items:
+            apply_purchase_return_item(item.product_id, purchase.warehouse_id, item.quantity, item.rate, purchase.id, purchase.purchase_no)
+        supplier = purchase.supplier
+        supplier.current_balance = float(supplier.current_balance or 0) - float(purchase.balance_amount or 0)
+        purchase.status = "Cancelled"
+        purchase.cancelled_at = date.today()
+        purchase.cancellation_reason = request.form.get("reason")
+        purchase.balance_amount = 0
+        record_audit("Update", "Purchase", purchase.id, new_data={"status": "Cancelled", "reason": purchase.cancellation_reason})
+        db.session.commit()
+        flash("Purchase cancelled and stock reversed.", "success")
+    except Exception as exc:
+        db.session.rollback(); flash(str(exc), "danger")
+    return redirect(url_for("purchases.index"))
 
 
 @bp.route("/<int:id>/print")
@@ -133,14 +190,84 @@ def return_create():
             supplier = Supplier.query.get(ret.supplier_id)
             balance = supplier.outstanding if supplier else 0
             db.session.add(SupplierLedger(date=ret.return_date, supplier_id=ret.supplier_id, reference_type="PurchaseReturn", reference_id=ret.id, reference_no=ret.return_no, debit=ret.grand_total, credit=0, balance=balance - float(ret.grand_total or 0), narration="Purchase return debit note"))
-            for item in items:
+            vendor_credit = VendorCredit(credit_no=next_number("vendor_credit"), credit_date=ret.return_date, supplier_id=ret.supplier_id, purchase_id=ret.purchase_id, purchase_return_id=ret.id, reason=ret.reason, subtotal=ret.subtotal, tax_total=ret.tax_total, grand_total=ret.grand_total, status="Issued", created_by=current_user.id)
+            db.session.add(vendor_credit); db.session.flush()
+            for index, item in enumerate(items):
                 db.session.add(PurchaseReturnItem(purchase_return_id=ret.id, product_id=item["product_id"], quantity=item["quantity"], rate=item["rate"], tax_rate=item["tax_rate"], tax_amount=item["tax_amount"], line_total=item["line_total"]))
+                db.session.add(VendorCreditItem(vendor_credit_id=vendor_credit.id, product_id=item["product_id"], quantity=item["quantity"], rate=item["rate"], tax_rate=item["tax_rate"], tax_amount=item["tax_amount"], line_total=item["line_total"]))
+                validate_return_tracking(index, item["product_id"])
                 apply_purchase_return_item(item["product_id"], ret.warehouse_id, item["quantity"], item["rate"], ret.id, ret.return_no)
+            create_journal(ret.return_date, "VendorCredit", vendor_credit.id, f"Vendor credit {vendor_credit.credit_no}", [{"account": account("Accounts Payable"), "debit": ret.grand_total}, {"account": account("Inventory"), "credit": float(ret.grand_total or 0) - float(ret.tax_total or 0)}, {"account": account("Tax Payable"), "credit": ret.tax_total}], current_user.id)
+            record_audit("Create", "PurchaseReturn", ret.id, new_data={"return_no": ret.return_no})
             db.session.commit(); flash("Purchase return saved and stock updated.", "success")
             return redirect(url_for("purchases.returns"))
         except Exception as exc:
             db.session.rollback(); flash(str(exc), "danger")
     return render_template("purchases/return_form.html", title="Create Purchase Return", suppliers=Supplier.query.all(), warehouses=Warehouse.query.all(), purchases=Purchase.query.order_by(Purchase.id.desc()).all(), today=date.today(), return_no=next_number("purchase_return"))
+
+
+@bp.route("/vendor-credits")
+@login_required
+def vendor_credits():
+    return render_template("purchases/vendor_credits.html", title="Vendor Credits", credits=VendorCredit.query.order_by(VendorCredit.id.desc()).all(), purchases=Purchase.query.filter(Purchase.balance_amount > 0).order_by(Purchase.purchase_date.desc()).all())
+
+
+@bp.route("/vendor-credits/<int:id>/apply", methods=["POST"])
+@login_required
+def vendor_credit_apply(id):
+    credit = VendorCredit.query.get_or_404(id)
+    purchase = Purchase.query.get_or_404(request.form["purchase_id"])
+    amount = min(float(request.form.get("amount") or 0), float(credit.grand_total or 0) - float(credit.applied_amount or 0) - float(credit.refunded_amount or 0), float(purchase.balance_amount or 0))
+    if amount <= 0:
+        flash("Enter a valid amount.", "warning")
+        return redirect(url_for("purchases.vendor_credits"))
+    purchase.paid_amount = float(purchase.paid_amount or 0) + amount
+    purchase.update_payment_status()
+    credit.applied_amount = float(credit.applied_amount or 0) + amount
+    db.session.commit()
+    flash("Vendor credit applied.", "success")
+    return redirect(url_for("purchases.vendor_credits"))
+
+
+@bp.route("/vendor-credits/<int:id>/refund", methods=["POST"])
+@login_required
+def vendor_credit_refund(id):
+    credit = VendorCredit.query.get_or_404(id)
+    amount = min(float(request.form.get("amount") or 0), float(credit.grand_total or 0) - float(credit.applied_amount or 0) - float(credit.refunded_amount or 0))
+    if amount <= 0:
+        flash("Enter a valid refund amount.", "warning")
+        return redirect(url_for("purchases.vendor_credits"))
+    credit.refunded_amount = float(credit.refunded_amount or 0) + amount
+    supplier = credit.supplier
+    supplier.current_balance = float(supplier.current_balance or 0) + amount
+    db.session.add(SupplierLedger(date=date.today(), supplier_id=credit.supplier_id, reference_type="VendorRefund", reference_id=credit.id, reference_no=credit.credit_no, debit=0, credit=amount, balance=supplier.outstanding + amount, narration="Refund from vendor credit"))
+    db.session.commit()
+    flash("Vendor refund recorded.", "success")
+    return redirect(url_for("purchases.vendor_credits"))
+
+
+def capture_purchase_tracking(index, product_id, warehouse_id, quantity, rate, purchase_id, purchase_no):
+    batch_no = request.form.getlist("batch_no[]")[index] if index < len(request.form.getlist("batch_no[]")) else ""
+    mfg = request.form.getlist("manufacture_date[]")[index] if index < len(request.form.getlist("manufacture_date[]")) else ""
+    exp = request.form.getlist("expiry_date[]")[index] if index < len(request.form.getlist("expiry_date[]")) else ""
+    if batch_no:
+        batch = Batch.query.filter_by(product_id=product_id, warehouse_id=warehouse_id, batch_no=batch_no).first()
+        if not batch:
+            batch = Batch(product_id=product_id, warehouse_id=warehouse_id, batch_no=batch_no, manufacture_date=date.fromisoformat(mfg) if mfg else None, expiry_date=date.fromisoformat(exp) if exp else None, purchase_reference=purchase_no, cost=rate or 0, quantity=0)
+            db.session.add(batch)
+        batch.quantity = float(batch.quantity or 0) + float(quantity or 0)
+    serials = request.form.getlist("serial_numbers[]")[index] if index < len(request.form.getlist("serial_numbers[]")) else ""
+    for serial in [s.strip() for s in serials.replace("\n", ",").split(",") if s.strip()]:
+        if not SerialNumber.query.filter_by(serial_no=serial).first():
+            db.session.add(SerialNumber(product_id=product_id, warehouse_id=warehouse_id, serial_no=serial, status="Available", purchase_id=purchase_id))
+
+
+def validate_return_tracking(index, product_id):
+    serials = request.form.getlist("serial_numbers[]")[index] if index < len(request.form.getlist("serial_numbers[]")) else ""
+    for serial in [s.strip() for s in serials.replace("\n", ",").split(",") if s.strip()]:
+        record = SerialNumber.query.filter_by(product_id=product_id, serial_no=serial).first()
+        if record:
+            record.status = "Returned"
 
 
 def upload_whatsapp_media(token, phone_id, pdf_file, filename):
@@ -191,3 +318,25 @@ def apply_purchase_tds(purchase):
         status="Deducted",
         created_by=current_user.id,
     ))
+
+
+def create_or_update_itc_entry(purchase):
+    if float(purchase.tax_total or 0) <= 0:
+        return None
+    entry = ITCEntry.query.filter_by(purchase_id=purchase.id).first() or ITCEntry(purchase_id=purchase.id, supplier_id=purchase.supplier_id)
+    tax_total = float(purchase.tax_total or 0)
+    taxable = float(purchase.subtotal or 0) - float(purchase.discount_total or 0)
+    entry.supplier_id = purchase.supplier_id
+    entry.invoice_no = purchase.supplier_invoice_no or purchase.purchase_no
+    entry.invoice_date = purchase.supplier_invoice_date or purchase.purchase_date
+    entry.taxable_value = taxable
+    entry.input_tax_cgst = tax_total / 2
+    entry.input_tax_sgst = tax_total / 2
+    entry.input_tax_igst = 0
+    entry.input_tax_vat = 0
+    entry.eligible_itc_amount = tax_total
+    entry.blocked_itc_amount = 0
+    entry.itc_status = entry.itc_status or "Eligible"
+    entry.claim_period = purchase.purchase_date.strftime("%Y-%m") if purchase.purchase_date else None
+    db.session.add(entry)
+    return entry

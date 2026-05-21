@@ -1,6 +1,7 @@
 import hmac
+import json
 import os
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from hashlib import sha256
 
 try:
@@ -11,10 +12,11 @@ from flask import Blueprint, flash, jsonify, redirect, render_template, render_t
 from flask_login import current_user, login_required
 
 from app.extensions import db
-from app.models import Currency, Customer, PaymentReceived, PrintTemplate, Product, Sale, Warehouse
+from app.models import CommunicationLog, Currency, Customer, IntegrationSetting, PaymentReceived, PrintTemplate, Product, Sale, Warehouse
 from app.services.document_service import hsn_summary
 from app.services.invoice_service import cancel_invoice, create_or_update_invoice, issue_invoice, line_totals, record_invoice_payment
 from app.services.numbering_service import next_number
+from app.services.audit_service import record_audit
 from app.utils.pdf_generator import render_pdf
 
 bp = Blueprint("invoices", __name__, url_prefix="/invoices")
@@ -120,6 +122,7 @@ def payment(id):
     try:
         payment_date = date.fromisoformat(request.form["payment_date"])
         record_invoice_payment(invoice, request.form["amount"], payment_date, request.form.get("payment_mode"), request.form.get("reference_no"), request.form.get("notes"), current_user.id)
+        record_audit("Payment Update", "Sale", invoice.id, new_data={"invoice_no": invoice.invoice_no, "amount": request.form["amount"]})
         db.session.commit()
         flash("Payment recorded and invoice balance updated.", "success")
     except Exception as exc:
@@ -134,6 +137,7 @@ def cancel(id):
     invoice = Sale.query.get_or_404(id)
     try:
         cancel_invoice(invoice, request.form.get("reason"), current_user.id)
+        record_audit("Invoice Cancellation", "Sale", invoice.id, new_data={"invoice_no": invoice.invoice_no, "reason": request.form.get("reason")})
         db.session.commit()
         flash("Invoice cancelled.", "success")
     except Exception as exc:
@@ -182,38 +186,67 @@ def api_detail(id):
 @bp.route("/<int:id>/pay")
 def pay(id):
     invoice = Sale.query.get_or_404(id)
-    key_id = os.environ.get("RAZORPAY_KEY_ID")
+    key_id, _ = razorpay_credentials()
     return render_template("invoices/pay.html", title=f"Pay {invoice.invoice_no}", invoice=invoice, key_id=key_id)
 
 
 @bp.route("/<int:id>/create-order", methods=["POST"])
 def create_order(id):
     invoice = Sale.query.get_or_404(id)
-    key_id = os.environ.get("RAZORPAY_KEY_ID")
-    key_secret = os.environ.get("RAZORPAY_KEY_SECRET")
+    key_id, key_secret = razorpay_credentials()
     if not key_id or not key_secret or not razorpay:
         return jsonify({"error": "Razorpay is not configured"}), 400
     amount = int(round(float(invoice.balance_amount or invoice.grand_total or 0) * 100))
+    if amount <= 0:
+        return jsonify({"error": "Invoice has no pending balance"}), 400
     client = razorpay.Client(auth=(key_id, key_secret))
     order = client.order.create({"amount": amount, "currency": "INR", "receipt": invoice.invoice_no, "notes": {"customer": invoice.customer.name, "invoice": invoice.invoice_no}})
+    invoice.razorpay_order_id = order["id"]
+    record_audit("Create", "RazorpayOrder", invoice.id, new_data={"order_id": order["id"], "amount": amount})
+    db.session.commit()
     return jsonify({"order_id": order["id"], "amount": amount, "currency": "INR", "key_id": key_id})
 
 
 @bp.route("/<int:id>/payment-callback", methods=["POST"])
 def payment_callback(id):
     invoice = Sale.query.get_or_404(id)
-    key_secret = os.environ.get("RAZORPAY_KEY_SECRET", "")
+    _, key_secret = razorpay_credentials()
     order_id = request.form.get("razorpay_order_id", "")
     payment_id = request.form.get("razorpay_payment_id", "")
     signature = request.form.get("razorpay_signature", "")
     expected = hmac.new(key_secret.encode(), f"{order_id}|{payment_id}".encode(), sha256).hexdigest()
     if not key_secret or not hmac.compare_digest(expected, signature):
+        record_audit("Payment Verification Failed", "Sale", invoice.id, new_data={"order_id": order_id, "payment_id": payment_id})
+        db.session.add(CommunicationLog(channel="payment", recipient=invoice.customer.name, subject=f"Razorpay failed {invoice.invoice_no}", provider="Razorpay", status="Failed", reference_type="invoice", reference_id=invoice.id, error_message="Invalid Razorpay signature"))
+        db.session.commit()
         flash("Payment verification failed.", "danger")
+        return redirect(url_for("invoices.pay", id=invoice.id))
+    if invoice.razorpay_payment_id == payment_id or PaymentReceived.query.filter_by(reference_no=payment_id).first():
+        flash("Payment callback was already processed.", "warning")
         return redirect(url_for("invoices.pay", id=invoice.id))
     try:
         record_invoice_payment(invoice, invoice.balance_amount or invoice.grand_total, date.today(), "Razorpay", payment_id, "Online payment", None)
+        invoice.razorpay_order_id = order_id
+        invoice.razorpay_payment_id = payment_id
+        invoice.razorpay_signature = signature
+        invoice.razorpay_verified_at = datetime.utcnow()
+        record_audit("Payment Verified", "Sale", invoice.id, new_data={"order_id": order_id, "payment_id": payment_id})
         db.session.commit()
         flash("Payment successful.", "success")
     except Exception as exc:
         db.session.rollback(); flash(str(exc), "danger")
     return redirect(url_for("invoices.pay", id=invoice.id))
+
+
+def razorpay_credentials():
+    key_id = os.environ.get("RAZORPAY_KEY_ID")
+    key_secret = os.environ.get("RAZORPAY_KEY_SECRET")
+    setting = IntegrationSetting.query.filter_by(provider_type="payment_gateway", provider_name="Razorpay", is_active=True).order_by(IntegrationSetting.id.desc()).first()
+    if setting and setting.config_json:
+        try:
+            config = json.loads(setting.config_json)
+            key_id = config.get("key_id") or config.get("RAZORPAY_KEY_ID") or key_id
+            key_secret = config.get("key_secret") or config.get("RAZORPAY_KEY_SECRET") or key_secret
+        except ValueError:
+            pass
+    return key_id, key_secret

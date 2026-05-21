@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="panel">
+  <div class="d-flex justify-content-between mb-3"><h2 class="h5">Sales Orders</h2><a class="btn btn-primary" href="{{ url_for('sales.order_create') }}">Create Order</a></div>
+  <table class="table datatable">
+    <thead><tr><th>No</th><th>Date</th><th>Customer</th><th>Total</th><th>Status</th><th></th></tr></thead>
+    <tbody>{% for o in orders %}<tr><td>{{ o.order_no }}</td><td>{{ o.order_date }}</td><td>{{ o.customer.name }}</td><td>{{ o.grand_total }}</td><td>{{ o.status }}</td><td><a class="btn btn-sm btn-outline-primary" href="{{ url_for('sales.order_detail', id=o.id) }}">Open</a></td></tr>{% endfor %}</tbody>
+  </table>
+</div>
+{% endblock %}

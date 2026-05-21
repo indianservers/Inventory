@@ -23,10 +23,16 @@ def login():
     if current_user.is_authenticated:
         return redirect(url_for("dashboard.index"))
     if request.method == "POST":
+        locked_until = session.get("login_locked_until")
+        if locked_until and datetime.utcnow().timestamp() < locked_until:
+            flash("Too many login attempts. Please try again after a few minutes.", "danger")
+            return render_template("auth/login.html", title="Login"), 429
         user = User.query.filter_by(email=request.form.get("email", "").strip().lower()).first()
         if user and user.is_active and user.check_password(request.form.get("password", "")):
             login_user(user)
             user.last_login = datetime.utcnow()
+            session["login_attempts"] = 0
+            session.pop("login_locked_until", None)
             db.session.add(AuditLog(user_id=user.id, action="Login", module="Auth", ip_address=request.remote_addr, user_agent=request.user_agent.string[:255]))
             db.session.commit()
             if user.totp_enabled:
@@ -34,6 +40,11 @@ def login():
                 return redirect(url_for("auth.two_factor_check"))
             session["2fa_verified"] = True
             return redirect(url_for("dashboard.index"))
+        session["login_attempts"] = session.get("login_attempts", 0) + 1
+        if session["login_attempts"] >= 5:
+            session["login_locked_until"] = (datetime.utcnow() + timedelta(minutes=5)).timestamp()
+        db.session.add(AuditLog(user_id=user.id if user else None, action="Login Failed", module="Auth", ip_address=request.remote_addr, user_agent=request.user_agent.string[:255]))
+        db.session.commit()
         flash("Invalid login or inactive account.", "danger")
     return render_template("auth/login.html", title="Login")
 

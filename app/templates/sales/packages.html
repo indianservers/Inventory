@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="row g-3">
+  <div class="col-lg-4">
+    <div class="panel"><h2 class="h5">Ready Picklists</h2>{% for p in picklists %}<form class="border-bottom py-2" method="post" action="{{ url_for('sales.package_create_from_picklist', id=p.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><strong>{{ p.picklist_no }}</strong><input class="form-control form-control-sm my-1" name="weight" type="number" step="0.001" placeholder="Weight"><input class="form-control form-control-sm my-1" name="remarks" placeholder="Remarks"><button class="btn btn-sm btn-primary">Create Package</button></form>{% endfor %}</div>
+  </div>
+  <div class="col-lg-8">
+    <div class="panel"><table class="table datatable"><thead><tr><th>No</th><th>Customer</th><th>Status</th><th>Weight</th><th></th></tr></thead><tbody>{% for p in packages %}<tr><td>{{ p.package_no }}</td><td>{{ p.customer.name }}</td><td>{{ p.status }}</td><td>{{ p.weight }}</td><td><a class="btn btn-sm btn-outline-secondary" href="{{ url_for('sales.package_packing_slip', id=p.id) }}">Slip</a></td></tr>{% endfor %}</tbody></table></div>
+  </div>
+</div>
+{% endblock %}

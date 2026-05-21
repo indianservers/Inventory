@@ -14,84 +14,172 @@
 </head>
 <body data-theme="{{ request.cookies.get('theme','light') }}" data-density="{{ request.cookies.get('density','comfortable') }}">
 {% if current_user.is_authenticated %}
-<aside class="sidebar">
-  <div class="brand"><i class="bi bi-box-seam"></i> Vyapara ERP</div>
-  <nav>
-    <a href="{{ url_for('dashboard.index') }}"><i class="bi bi-speedometer2"></i> Dashboard</a>
-    <a href="{{ url_for('pos.index') }}"><i class="bi bi-calculator"></i> POS</a>
-    <div class="nav-title">Masters</div>
-    <a href="{{ url_for('products.index') }}"><i class="bi bi-box"></i> Products</a>
-    <a href="{{ url_for('masters.categories') }}"><i class="bi bi-diagram-3"></i> Categories</a>
-    <a href="{{ url_for('masters.brands') }}"><i class="bi bi-tags"></i> Brands</a>
-    <a href="{{ url_for('masters.units') }}"><i class="bi bi-rulers"></i> Units</a>
-    <a href="{{ url_for('masters.warehouses') }}"><i class="bi bi-buildings"></i> Warehouses</a>
-    <a href="{{ url_for('price_lists.index') }}"><i class="bi bi-currency-rupee"></i> Price Lists</a>
-    <a href="{{ url_for('settings.currencies') }}"><i class="bi bi-currency-exchange"></i> Currencies</a>
-    <div class="nav-title">Parties</div>
-    <a href="{{ url_for('parties.customers') }}"><i class="bi bi-people"></i> Customers</a>
-    <a href="{{ url_for('parties.suppliers') }}"><i class="bi bi-truck"></i> Suppliers</a>
-    <div class="nav-title">Transactions</div>
-    <a href="{{ url_for('purchases.index') }}"><i class="bi bi-cart-plus"></i> Purchases</a>
-    <a href="{{ url_for('purchase_orders.index') }}"><i class="bi bi-clipboard-check"></i> Purchase Orders</a>
-    <a href="{{ url_for('purchase_orders.grn_create') }}"><i class="bi bi-box-arrow-in-down"></i> Goods Receipts</a>
-    <a href="{{ url_for('invoices.index') }}"><i class="bi bi-receipt"></i> Invoices</a>
-    <a href="{{ url_for('sales.index') }}"><i class="bi bi-bag-check"></i> Sales</a>
-    <a href="{{ url_for('sales.quotations') }}"><i class="bi bi-file-earmark-text"></i> Quotations</a>
-    <a href="{{ url_for('notes.credit_notes') }}"><i class="bi bi-file-minus"></i> Credit Notes</a>
-    <a href="{{ url_for('notes.debit_notes') }}"><i class="bi bi-file-plus"></i> Debit Notes</a>
-    <a href="{{ url_for('recurring.index') }}"><i class="bi bi-arrow-repeat"></i> Recurring</a>
-    <a href="{{ url_for('manufacturing.bom_index') }}"><i class="bi bi-tools"></i> Manufacturing</a>
-    <a href="{{ url_for('stock.current') }}"><i class="bi bi-boxes"></i> Stock</a>
-    <a href="{{ url_for('accounts.receipts') }}"><i class="bi bi-cash-coin"></i> Receipts</a>
-    <a href="{{ url_for('accounts.payments') }}"><i class="bi bi-wallet2"></i> Payments</a>
-    <a href="{{ url_for('accounts.expenses') }}"><i class="bi bi-graph-down-arrow"></i> Expenses</a>
-    <div class="nav-title">Accounts</div>
-    <a href="{{ url_for('accounts.chart') }}"><i class="bi bi-journal-bookmark"></i> Chart of Accounts</a>
-    <a href="{{ url_for('accounts.journals') }}"><i class="bi bi-journal-text"></i> Journals</a>
-    <a href="{{ url_for('accounts.tds_ledger') }}"><i class="bi bi-percent"></i> TDS Ledger</a>
-    <a href="{{ url_for('accounts.tcs_ledger') }}"><i class="bi bi-percent"></i> TCS Ledger</a>
-    <a href="{{ url_for('reports.index') }}"><i class="bi bi-bar-chart"></i> Reports</a>
-    <div class="nav-title">Tax Reports</div>
-    <a href="{{ url_for('reports.gstr1_report') }}"><i class="bi bi-file-earmark-ruled"></i> GSTR-1</a>
-    <div class="nav-title">Settings</div>
-    <a href="{{ url_for('settings.company') }}"><i class="bi bi-gear"></i> Company Settings</a>
-    <a href="{{ url_for('settings.users') }}"><i class="bi bi-person-gear"></i> Users & Roles</a>
-    <a href="{{ url_for('settings.api_tokens') }}"><i class="bi bi-key"></i> API Tokens</a>
-    <a href="{{ url_for('settings.templates') }}"><i class="bi bi-filetype-html"></i> Print Templates</a>
-    <a href="{{ url_for('settings.scheduled_reports') }}"><i class="bi bi-send-check"></i> Scheduled Reports</a>
-    <a href="{{ url_for('settings.audit') }}"><i class="bi bi-clock-history"></i> Audit Trail</a>
-    <a href="{{ url_for('settings.backup') }}"><i class="bi bi-database"></i> Backup</a>
+<aside class="sidebar app-sidebar">
+  <div class="brand">
+    <span class="brand-mark"><i class="bi bi-grid-1x2"></i></span>
+    <span><strong>Vyapara</strong><small>ERP Command</small></span>
+  </div>
+  <nav class="nav-accordion">
+    <a class="nav-leaf" href="{{ url_for('dashboard.index') }}"><i class="bi bi-speedometer2"></i> Dashboard</a>
+    <details open>
+      <summary><i class="bi bi-calculator"></i> POS</summary>
+      <a href="{{ url_for('pos.index') }}">Billing Terminal</a>
+      <a href="{{ url_for('pos.held_bills') }}">Held Bills</a>
+      <a href="{{ url_for('pos.sessions') }}">Register Sessions</a>
+    </details>
+    <details open>
+      <summary><i class="bi bi-bag-check"></i> Sales</summary>
+      <a href="{{ url_for('invoices.index') }}">Invoices</a>
+      <a href="{{ url_for('sales.index') }}">Sales Register</a>
+      <a href="{{ url_for('sales.orders') }}">Sales Orders</a>
+      <a href="{{ url_for('sales.quotations') }}">Quotations</a>
+      <a href="{{ url_for('accounts.receipts') }}">Payments Received</a>
+      <a href="{{ url_for('sales.returns') }}">Returns</a>
+      <a href="{{ url_for('notes.credit_notes') }}">Credit Notes</a>
+      <a href="{{ url_for('sales.delivery_bills') }}">Delivery Bills</a>
+      <a href="{{ url_for('sales.picklists') }}">Picklists</a>
+      <a href="{{ url_for('sales.packages') }}">Packages</a>
+    </details>
+    <details>
+      <summary><i class="bi bi-cart-plus"></i> Purchases</summary>
+      <a href="{{ url_for('purchases.index') }}">Purchase Bills</a>
+      <a href="{{ url_for('purchase_orders.index') }}">Purchase Orders</a>
+      <a href="{{ url_for('purchase_orders.grn_create') }}">Goods Receipts</a>
+      <a href="{{ url_for('accounts.payments') }}">Payments Made</a>
+      <a href="{{ url_for('purchases.returns') }}">Purchase Returns</a>
+      <a href="{{ url_for('purchases.vendor_credits') }}">Vendor Credits</a>
+      <a href="{{ url_for('notes.debit_notes') }}">Debit Notes</a>
+    </details>
+    <details open>
+      <summary><i class="bi bi-boxes"></i> Inventory</summary>
+      <a href="{{ url_for('products.index') }}">Item Master</a>
+      <a href="{{ url_for('stock.current') }}">Stock Dashboard</a>
+      <a href="{{ url_for('stock.reorder_suggestions') }}">Reorder Suggestions</a>
+      <a href="{{ url_for('products.barcode_labels') }}">Barcode Labels</a>
+      <a href="{{ url_for('masters.categories') }}">Categories</a>
+      <a href="{{ url_for('masters.brands') }}">Brands</a>
+      <a href="{{ url_for('masters.units') }}">Units</a>
+      <a href="{{ url_for('stock.opening_stock') }}">Opening Stock</a>
+      <a href="{{ url_for('stock.adjustments') }}">Stock Adjustments</a>
+      <a href="{{ url_for('stock.transfers') }}">Stock Transfers</a>
+      <a href="{{ url_for('stock.batches') }}">Batches / Expiry</a>
+      <a href="{{ url_for('stock.serial_numbers') }}">Serial Numbers</a>
+      <a href="{{ url_for('stock.composite_items') }}">Bundles / Kits</a>
+      <a href="{{ url_for('manufacturing.bom_index') }}">Manufacturing</a>
+    </details>
+    <details>
+      <summary><i class="bi bi-people"></i> Parties</summary>
+      <a href="{{ url_for('parties.customers') }}">Customers</a>
+      <a href="{{ url_for('parties.suppliers') }}">Suppliers</a>
+      <a href="{{ url_for('price_lists.index') }}">Price Lists</a>
+    </details>
+    <details>
+      <summary><i class="bi bi-journal-bookmark"></i> Accounts</summary>
+      <a href="{{ url_for('accounts.chart') }}">Chart of Accounts</a>
+      <a href="{{ url_for('accounts.journals') }}">Journals</a>
+      <a href="{{ url_for('accounts.receipts') }}">Receipts</a>
+      <a href="{{ url_for('accounts.payments') }}">Payments</a>
+      <a href="{{ url_for('accounts.expenses') }}">Expenses</a>
+      <a href="{{ url_for('accounts.itc_register') }}">ITC Register</a>
+      <a href="{{ url_for('accounts.tds_ledger') }}">TDS Ledger</a>
+      <a href="{{ url_for('accounts.tcs_ledger') }}">TCS Ledger</a>
+    </details>
+    <details>
+      <summary><i class="bi bi-bar-chart"></i> Reports</summary>
+      <a href="{{ url_for('reports.index') }}">Reports Center</a>
+      <a href="{{ url_for('reports.gstr1_report') }}">GSTR-1</a>
+      <a href="{{ url_for('reports.gstr3b_report') }}">GSTR-3B</a>
+      <a href="{{ url_for('reports.tally_export') }}">Tally XML Export</a>
+      <a href="{{ url_for('settings.audit') }}">Activity Log</a>
+      <a href="{{ url_for('integrations.communication_logs') }}">Communication Logs</a>
+      <a href="{{ url_for('integrations.webhook_logs') }}">Webhook Logs</a>
+      <a href="{{ url_for('integrations.scheduler_logs') }}">Scheduler Logs</a>
+    </details>
+    <details>
+      <summary><i class="bi bi-lightning-charge"></i> Automation</summary>
+      <a href="{{ url_for('integrations.workflows') }}">Workflow Builder</a>
+      <a href="{{ url_for('integrations.scheduled_jobs') }}">Scheduled Jobs</a>
+      <a href="{{ url_for('settings.scheduled_reports') }}">Scheduled Reports</a>
+      <a href="{{ url_for('recurring.index') }}">Recurring Invoices</a>
+    </details>
+    <details>
+      <summary><i class="bi bi-plug"></i> Integrations</summary>
+      <a href="{{ url_for('integrations.communication_settings') }}">Communication Settings</a>
+      <a href="{{ url_for('integrations.payment_gateways') }}">Payment Gateways</a>
+      <a href="{{ url_for('integrations.ecommerce_integrations') }}">Ecommerce</a>
+      <a href="{{ url_for('integrations.shipping_providers') }}">Shipping</a>
+      <a href="{{ url_for('integrations.api_keys') }}">API Keys</a>
+      <a href="{{ url_for('integrations.webhooks') }}">Webhooks</a>
+      <a href="{{ url_for('integrations.customization') }}">Customization Studio</a>
+      <a href="{{ url_for('integrations.custom_fields') }}">Custom Fields</a>
+      <a href="{{ url_for('integrations.custom_views') }}">Custom Views</a>
+      <a href="{{ url_for('integrations.custom_modules') }}">Custom Modules</a>
+      {% for module in custom_modules_nav %}
+      <a href="{{ url_for('integrations.custom_module_detail', id=module.id) }}"><i class="bi {{ module.icon or 'bi-grid' }}"></i> {{ module.plural_name or module.name }}</a>
+      {% endfor %}
+    </details>
+    <details>
+      <summary><i class="bi bi-gear"></i> Settings</summary>
+      <a href="{{ url_for('settings.company') }}">Company Profile</a>
+      <a href="{{ url_for('settings.business_profile') }}">Business Profile</a>
+      <a href="{{ url_for('settings.branches') }}">Branches</a>
+      <a href="{{ url_for('settings.warehouses') }}">Warehouses</a>
+      <a href="{{ url_for('settings.registers') }}">POS Registers</a>
+      <a href="{{ url_for('settings.users') }}">Users</a>
+      <a href="{{ url_for('settings.roles') }}">Roles & Permissions</a>
+      <a href="{{ url_for('masters.taxes') }}">Taxes</a>
+      <a href="{{ url_for('settings.currencies') }}">Currencies</a>
+      <a href="{{ url_for('settings.templates') }}">Print Templates</a>
+      <a href="{{ url_for('integrations.email_templates') }}">Email Templates</a>
+      <a href="{{ url_for('integrations.loyalty_settings') }}">Loyalty Settings</a>
+      <a href="{{ url_for('integrations.coupons') }}">Coupons</a>
+      <a href="{{ url_for('settings.backup') }}">Backup</a>
+    </details>
   </nav>
 </aside>
-<main class="content">
-  <header class="topbar">
-    <div>
+<main class="content app-content">
+  <header class="topbar command-bar">
+    <div class="page-title">
       <h1>{{ title or "Dashboard" }}</h1>
       <small>{{ company.company_name if company else "Vyapara ERP" }}</small>
     </div>
-    <a class="btn btn-success d-none d-md-inline-flex" href="{{ url_for('pos.index') }}"><i class="bi bi-calculator"></i> POS</a>
-    <form class="d-none d-lg-flex flex-grow-1 mx-4" action="{{ url_for('search.index') }}" method="get" style="max-width:520px">
-      <div class="input-group">
-        <span class="input-group-text"><i class="bi bi-search"></i></span>
-        <input class="form-control global-search" name="q" placeholder="Search products, parties, invoices" value="{{ request.args.get('q','') }}">
-      </div>
+    <form class="command-search" action="{{ url_for('search.index') }}" method="get">
+      <span><i class="bi bi-search"></i></span>
+      <input name="q" placeholder="Search products, parties, invoices, reports" value="{{ request.args.get('q','') }}">
+      <kbd>⌘K</kbd>
     </form>
-    <div class="d-flex gap-2 align-items-center">
+    <div class="command-actions">
+      <select class="form-select form-select-sm branch-select" aria-label="Branch selector">
+        <option>All Branches</option>
+        {% for branch in branches %}<option>{{ branch.name }}</option>{% endfor %}
+      </select>
+      <select class="form-select form-select-sm fy-select" aria-label="Financial year selector">
+        <option>FY 2026-27</option>
+        <option>FY 2025-26</option>
+      </select>
       <div class="dropdown">
-        <button class="btn btn-sm btn-primary dropdown-toggle" data-bs-toggle="dropdown"><i class="bi bi-plus-lg"></i></button>
+        <button class="btn btn-primary btn-sm dropdown-toggle" data-bs-toggle="dropdown"><i class="bi bi-plus-lg"></i> Create</button>
         <div class="dropdown-menu dropdown-menu-end">
           <a class="dropdown-item" href="{{ url_for('products.create') }}">Product</a>
           <a class="dropdown-item" href="{{ url_for('parties.customer_create') }}">Customer</a>
           <a class="dropdown-item" href="{{ url_for('parties.supplier_create') }}">Supplier</a>
           <a class="dropdown-item" href="{{ url_for('invoices.create') }}">Invoice</a>
+          <a class="dropdown-item" href="{{ url_for('purchase_orders.create') }}">Purchase Order</a>
           <a class="dropdown-item" href="{{ url_for('accounts.receipts') }}">Receipt</a>
         </div>
       </div>
+      <a class="btn btn-success btn-sm top-pos" href="{{ url_for('pos.index') }}"><i class="bi bi-calculator"></i> POS</a>
+      <button class="btn btn-sm btn-outline-secondary" title="Notifications"><i class="bi bi-bell"></i></button>
       <button class="btn btn-sm btn-outline-secondary" id="theme-toggle" title="Toggle theme"><i class="bi bi-moon"></i></button>
       <button class="btn btn-sm btn-outline-secondary" id="density-toggle" title="Toggle table density"><i class="bi bi-arrows-collapse"></i></button>
-      <span class="badge text-bg-primary">{{ current_user.role.name }}</span>
-      <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('auth.profile') }}"><i class="bi bi-person-circle"></i></a>
-      <a class="btn btn-sm btn-outline-danger" href="{{ url_for('auth.logout') }}"><i class="bi bi-box-arrow-right"></i></a>
+      <div class="dropdown">
+        <button class="btn btn-sm btn-outline-secondary dropdown-toggle user-chip" data-bs-toggle="dropdown"><i class="bi bi-person-circle"></i> {{ current_user.name }}</button>
+        <div class="dropdown-menu dropdown-menu-end">
+          <span class="dropdown-item-text small text-muted">{{ current_user.role.name }}</span>
+          <a class="dropdown-item" href="{{ url_for('auth.profile') }}">Profile</a>
+          <a class="dropdown-item text-danger" href="{{ url_for('auth.logout') }}">Logout</a>
+        </div>
+      </div>
     </div>
   </header>
   {% include "_flash.html" %}

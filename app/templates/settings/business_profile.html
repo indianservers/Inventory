@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block content %}
+<form method="post" class="business-profile-page">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <div class="detail-hero">
+    <div>
+      <span class="eyebrow">Business setup</span>
+      <h2>Shape Vyapara around your business model</h2>
+      <p>Choose the closest operating style. Vyapara keeps the full ERP available, but highlights the workflows that matter most for your counters, inventory, tax and accounting.</p>
+    </div>
+    <button class="btn btn-primary btn-lg"><i class="bi bi-check2-circle"></i> Save Profile</button>
+  </div>
+
+  <div class="business-grid">
+    {% for name, profile in profiles.items() %}
+    <label class="business-card">
+      <input type="radio" name="business_type" value="{{ name }}" {% if setting.business_type == name %}checked{% endif %}>
+      <span class="business-card-head">
+        <strong>{{ name }}</strong>
+        <i class="bi bi-check-circle-fill"></i>
+      </span>
+      <small>{{ profile.focus }}</small>
+      <span class="module-pills">
+        {% for module in profile.modules %}<em>{{ module }}</em>{% endfor %}
+      </span>
+    </label>
+    {% endfor %}
+  </div>
+
+  <div class="panel mt-3">
+    <h3 class="h6">Global Inventory Guardrails</h3>
+    <label class="form-check form-switch">
+      <input class="form-check-input" name="enable_negative_stock" type="checkbox" {% if setting.enable_negative_stock %}checked{% endif %}>
+      <span class="form-check-label">Allow negative stock where supervisors approve the transaction</span>
+    </label>
+  </div>
+</form>
+{% endblock %}

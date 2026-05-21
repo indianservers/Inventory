@@ -1,0 +1,8 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="panel" style="max-width:760px">
+  <div class="d-flex justify-content-between"><h2 class="h5">Packing Slip {{ package.package_no }}</h2><button class="btn btn-outline-secondary" onclick="window.print()">Print</button></div>
+  <p>{{ package.customer.name }}<br>{{ package.customer.shipping_address or package.customer.billing_address }}</p>
+  <table class="table"><thead><tr><th>Product</th><th>Quantity</th></tr></thead><tbody>{% for item in package.items %}<tr><td>{{ item.product.name }}</td><td>{{ item.quantity }}</td></tr>{% endfor %}</tbody></table>
+</div>
+{% endblock %}

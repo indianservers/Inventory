@@ -4,9 +4,11 @@ from app import create_app
 from app.extensions import db
 from app.models import (
     AccountGroup,
+    Branch,
     Brand,
     Category,
     ChartOfAccounts,
+    Company,
     CompanySetting,
     Customer,
     ExpenseCategory,
@@ -17,9 +19,13 @@ from app.models import (
     Product,
     Role,
     RolePermission,
+    Register,
     Supplier,
     Currency,
+    EmailTemplate,
+    IntegrationSetting,
     TDSSection,
+    ScheduledJob,
     Tax,
     Unit,
     User,
@@ -28,8 +34,8 @@ from app.models import (
 
 app = create_app()
 
-ROLES = ["Super Admin", "Admin", "Accountant", "Sales Executive", "Purchase Executive", "Stock Manager", "Viewer"]
-MODULES = ["dashboard", "products", "categories", "brands", "units", "warehouses", "customers", "suppliers", "purchases", "purchase_orders", "grn", "pos", "price_lists", "manufacturing", "recurring", "sales", "invoices", "returns", "quotations", "payments", "stock", "accounts", "expenses", "reports", "settings", "scheduled_reports", "backup", "audit"]
+ROLES = ["Super Admin", "Admin", "Manager", "Cashier", "Inventory Staff", "Accountant", "Sales Executive", "Purchase Executive", "Stock Manager", "Viewer"]
+MODULES = ["dashboard", "products", "inventory", "categories", "brands", "units", "warehouses", "customers", "suppliers", "purchases", "purchase_orders", "grn", "pos", "price_lists", "manufacturing", "recurring", "sales", "invoices", "returns", "quotations", "payments", "stock", "accounts", "expenses", "reports", "settings", "scheduled_reports", "backup", "audit"]
 ACTIONS = ["view", "create", "edit", "delete", "print", "export", "approve"]
 
 
@@ -59,6 +65,12 @@ with app.app_context():
             allowed = role_name in ["Super Admin", "Admin"] or perm.action == "view"
             if role_name == "Accountant" and perm.module in ["accounts", "payments", "expenses", "reports"]:
                 allowed = True
+            if role_name == "Manager":
+                allowed = perm.action != "delete"
+            if role_name == "Cashier" and perm.module in ["pos", "sales", "invoices", "customers", "reports"]:
+                allowed = perm.action in ["view", "create", "print"]
+            if role_name == "Inventory Staff" and perm.module in ["products", "inventory", "stock", "warehouses", "reports"]:
+                allowed = perm.action != "delete"
             if role_name == "Sales Executive" and perm.module in ["sales", "invoices", "customers", "quotations", "reports"]:
                 allowed = perm.action != "delete"
             if role_name == "Purchase Executive" and perm.module in ["purchases", "suppliers", "reports"]:
@@ -81,8 +93,15 @@ with app.app_context():
     if not setting:
         db.session.add(CompanySetting(company_name="Vyapara ERP", address="Your business address", phone="9999999999", email="admin@example.com", tax_number="GSTIN000000000", default_invoice_terms="Goods once sold are subject to business terms."))
 
-    warehouse = get_or_create(Warehouse, code="MAIN", defaults={"name": "Main Warehouse", "status": True})
-    get_or_create(Warehouse, code="POS", defaults={"name": "POS Warehouse", "status": True})
+    company = get_or_create(Company, legal_name="Vyapara ERP", defaults={"trade_name": "Vyapara ERP", "address": "Your business address", "phone": "9999999999", "email": "admin@example.com", "tax_number": "GSTIN000000000", "currency": "INR", "financial_year_start_month": 4, "invoice_prefix": "INV", "is_active": True})
+    main_branch = get_or_create(Branch, code="MAIN", defaults={"name": "Main Branch", "address": company.address, "contact_person": "Administrator", "phone": company.phone, "email": company.email, "tax_number": company.tax_number, "status": True})
+    warehouse = get_or_create(Warehouse, code="MAIN", defaults={"name": "Main Warehouse", "branch_id": main_branch.id, "status": True})
+    if not warehouse.branch_id:
+        warehouse.branch_id = main_branch.id
+    pos_warehouse = get_or_create(Warehouse, code="POS", defaults={"name": "POS Warehouse", "branch_id": main_branch.id, "status": True})
+    if not pos_warehouse.branch_id:
+        pos_warehouse.branch_id = main_branch.id
+    get_or_create(Register, code="POS-1", defaults={"name": "Main POS Register", "branch_id": main_branch.id, "warehouse_id": pos_warehouse.id, "receipt_printer": "Default Receipt Printer", "status": True})
     get_or_create(PriceList, name="Default Retail", defaults={"description": "Default customer price list", "discount_pct": 0, "currency": "INR", "is_default": True, "status": True})
     get_or_create(Currency, code="INR", defaults={"name": "Indian Rupee", "symbol": "Rs.", "exchange_rate": 1, "is_base": True})
     get_or_create(Currency, code="USD", defaults={"name": "US Dollar", "symbol": "$", "exchange_rate": 83, "auto_update": True})
@@ -99,6 +118,18 @@ with app.app_context():
         ("Thermal", "<div style='width:80mm;font-family:monospace'><center>{{ company.company_name }}<br>Invoice {{ invoice.invoice_no }}</center>{% for item in items %}<div>{{ item.product.name }} x {{ item.quantity }} = {{ item.line_total }}</div>{% endfor %}<hr>Total {{ invoice.grand_total }}</div>", False),
     ]:
         get_or_create(PrintTemplate, name=name, template_type="sales_invoice", defaults={"html": html, "is_default": is_default})
+    for template_type, name, subject, body in [
+        ("invoice_email", "Invoice Email", "Invoice {{ invoice.invoice_no }}", "Dear {{ customer.name }}, please find invoice {{ invoice.invoice_no }} for {{ invoice.grand_total }}."),
+        ("payment_receipt_email", "Payment Receipt Email", "Payment receipt", "Thank you. Your payment has been recorded."),
+        ("sales_order_email", "Sales Order Email", "Sales order {{ order.order_no }}", "Your sales order has been created."),
+        ("purchase_order_email", "Purchase Order Email", "Purchase order {{ po.po_no }}", "Please process the attached purchase order."),
+        ("payment_reminder", "Payment Reminder", "Payment reminder", "This is a reminder for your outstanding invoice."),
+        ("low_stock_alert", "Low Stock Alert", "Low stock: {{ product.name }}", "{{ product.name }} is below reorder level."),
+        ("delivery_update", "Delivery Update", "Delivery update", "Your delivery status has been updated."),
+    ]:
+        get_or_create(EmailTemplate, name=name, template_type=template_type, defaults={"subject": subject, "body": body, "placeholders": "{{ invoice.invoice_no }}, {{ customer.name }}, {{ product.name }}", "is_active": True})
+    get_or_create(IntegrationSetting, provider_type="email", provider_name="SMTP Test Mode", defaults={"config_json": "{}", "is_active": True, "test_mode": True})
+    get_or_create(ScheduledJob, name="Daily Low Stock Alert", defaults={"job_type": "low_stock_alert", "frequency": "Daily", "time_of_day": "09:00", "config_json": "{}", "is_active": True})
     unit = get_or_create(Unit, name="Piece", defaults={"short_name": "pcs", "decimal_allowed": False, "status": True})
     get_or_create(Unit, name="Kilogram", defaults={"short_name": "kg", "decimal_allowed": True, "status": True})
     category = get_or_create(Category, name="General", defaults={"description": "General items", "status": True})

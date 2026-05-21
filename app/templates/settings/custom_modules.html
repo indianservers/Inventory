@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="row g-3">
+  <div class="col-lg-4">
+    <div class="panel sticky-top" style="top: 1rem;">
+      <h2 class="h5 mb-3">Create Custom Module</h2>
+      <form method="post">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <label class="form-label">Module Name</label>
+        <input class="form-control mb-2" name="name" placeholder="Service Job" required>
+        <label class="form-label">Plural Name</label>
+        <input class="form-control mb-2" name="plural_name" placeholder="Service Jobs">
+        <label class="form-label">Module Key</label>
+        <input class="form-control mb-2" name="module_key" placeholder="service_jobs">
+        <label class="form-label">Icon</label>
+        <input class="form-control mb-2" name="icon" value="bi-grid" placeholder="bi-briefcase">
+        <label class="form-label">Description</label>
+        <textarea class="form-control mb-2" name="description" rows="3"></textarea>
+        <div class="row g-2 mb-3">
+          <div class="col-6"><div class="form-check"><input class="form-check-input" type="checkbox" name="show_in_sidebar" checked><label class="form-check-label">Sidebar</label></div></div>
+          <div class="col-6"><div class="form-check"><input class="form-check-input" type="checkbox" name="allow_import" checked><label class="form-check-label">Import</label></div></div>
+          <div class="col-6"><div class="form-check"><input class="form-check-input" type="checkbox" name="allow_export" checked><label class="form-check-label">Export</label></div></div>
+          <div class="col-6"><div class="form-check"><input class="form-check-input" type="checkbox" name="is_active" checked><label class="form-check-label">Active</label></div></div>
+        </div>
+        <button class="btn btn-primary w-100">Create Module</button>
+      </form>
+    </div>
+  </div>
+  <div class="col-lg-8">
+    <div class="detail-hero mb-3">
+      <div>
+        <p class="eyebrow mb-1">Custom Modules</p>
+        <h2 class="mb-0">Business-specific records</h2>
+      </div>
+      <a class="btn btn-outline-secondary" href="{{ url_for('integrations.customization') }}">Studio</a>
+    </div>
+    {% if modules %}
+    <div class="row g-3">
+      {% for module in modules %}
+      <div class="col-md-6">
+        <div class="panel h-100">
+          <div class="d-flex justify-content-between gap-2">
+            <div class="d-flex gap-3">
+              <span class="module-icon"><i class="bi {{ module.icon or 'bi-grid' }}"></i></span>
+              <div>
+                <h3 class="h5 mb-1">{{ module.plural_name or module.name }}</h3>
+                <p class="text-muted mb-2">{{ module.description or module.module_key }}</p>
+                <span class="badge {{ 'text-bg-success' if module.is_active else 'text-bg-secondary' }}">{{ 'Active' if module.is_active else 'Inactive' }}</span>
+                <span class="badge text-bg-light">{{ module.fields.count() }} fields</span>
+                <span class="badge text-bg-light">{{ module.records.count() }} records</span>
+              </div>
+            </div>
+          </div>
+          <div class="d-flex gap-2 mt-3">
+            <a class="btn btn-sm btn-primary" href="{{ url_for('integrations.custom_module_detail', id=module.id) }}">Open</a>
+            <form method="post" action="{{ url_for('integrations.custom_module_toggle', id=module.id) }}">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button class="btn btn-sm btn-outline-secondary">{{ 'Deactivate' if module.is_active else 'Reactivate' }}</button>
+            </form>
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="panel empty-state py-5">
+      <i class="bi bi-grid"></i>
+      <h3>No custom modules yet</h3>
+      <p>Use the form to create modules for appointments, service jobs, rentals, projects, or warranties.</p>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

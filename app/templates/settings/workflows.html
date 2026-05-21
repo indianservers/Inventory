@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="detail-hero">
+  <div>
+    <span class="eyebrow">Automation studio</span>
+    <h2>Workflow Builder</h2>
+    <p>Create rules that react to events like invoice creation, payment received, low stock, PO received, customer overdue and stock expiry.</p>
+  </div>
+  <form method="post" action="{{ url_for('integrations.run_due_jobs') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <button class="btn btn-outline-primary"><i class="bi bi-play-circle"></i> Run Due Jobs</button>
+  </form>
+</div>
+<div class="workflow-builder">
+  <section class="panel">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <h2 class="h6 mb-0">Active Workflows</h2>
+      <span class="status-badge badge-muted">{{ rows|length }} rule(s)</span>
+    </div>
+    <div class="table-responsive">
+      <table class="table align-middle datatable">
+        <thead><tr><th>Rule</th><th>Trigger</th><th>Actions</th><th>Status</th><th>Last run</th><th>Runs</th></tr></thead>
+        <tbody>
+          {% for rule in rows %}
+          <tr>
+            <td><strong>{{ rule.name }}</strong><div class="text-muted small">Module automation</div></td>
+            <td>{{ rule.trigger_event }}</td>
+            <td>{% for action in rule.actions %}<span class="status-badge badge-muted">{{ action.action_type }}</span>{% endfor %}</td>
+            <td><span class="status-badge {{ 'badge-ok' if rule.is_active else 'badge-muted' }}">{{ 'Active' if rule.is_active else 'Paused' }}</span></td>
+            <td>{{ rule.last_run_at or 'Never' }}</td>
+            <td>{{ rule.success_count or 0 }} ok / {{ rule.failure_count or 0 }} failed</td>
+          </tr>
+          {% else %}
+          <tr><td colspan="6"><div class="empty-state compact"><i class="bi bi-lightning-charge"></i><strong>No workflows yet</strong><small>Create your first automation on the right.</small></div></td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+  <aside class="workflow-card">
+    <h3 class="h6">Create Workflow</h3>
+    <form method="post" class="d-grid gap-2">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <label class="form-label">Name<input class="form-control" name="name" required placeholder="Low stock reorder alert"></label>
+      <label class="form-label">Trigger
+        <select class="form-select" name="trigger_event">
+          {% for trigger in ['invoice.created','payment.received','stock.low','purchase_order.received','customer.overdue','stock.expired','invoice.paid'] %}
+          <option value="{{ trigger }}">{{ trigger }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <div class="row g-2">
+        <div class="col-5"><input class="form-control" name="condition_field" placeholder="Condition field"></div>
+        <div class="col-3"><select class="form-select" name="condition_operator"><option>equals</option><option>greater_than</option><option>less_than</option><option>contains</option></select></div>
+        <div class="col-4"><input class="form-control" name="condition_value" placeholder="Value"></div>
+      </div>
+      <label class="form-label">Action
+        <select class="form-select" name="action_type">
+          {% for action in ['send_email','send_whatsapp','create_task','create_purchase_order','apply_tag','call_webhook','generate_report'] %}
+          <option value="{{ action }}">{{ action.replace('_',' ')|title }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <textarea class="form-control" name="action_config" rows="4" placeholder='{"template":"low_stock_alert"}'>{}</textarea>
+      <label class="form-check form-switch"><input class="form-check-input" type="checkbox" name="is_active" checked> Active</label>
+      <button class="btn btn-primary">Save Workflow</button>
+      <button class="btn btn-outline-secondary" type="button" disabled>Test Workflow</button>
+    </form>
+  </aside>
+</div>
+{% endblock %}

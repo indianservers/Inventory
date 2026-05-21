@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="row g-3">
+  <div class="col-lg-4">
+    <form class="panel" method="post" novalidate>
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <h2 class="h5">Opening Stock</h2>
+      <label class="form-label">Opening No</label><input class="form-control mb-2" name="opening_no" value="{{ opening_no }}">
+      <label class="form-label">Date</label><input class="form-control mb-2" type="date" name="opening_date" value="{{ today }}" required>
+      <label class="form-label">Product</label><select class="form-select mb-2" name="product_id" required>{% for product in products %}<option value="{{ product.id }}">{{ product.sku }} - {{ product.name }}</option>{% endfor %}</select>
+      <label class="form-label">Warehouse</label><select class="form-select mb-2" name="warehouse_id" required>{% for warehouse in warehouses %}<option value="{{ warehouse.id }}">{{ warehouse.name }}</option>{% endfor %}</select>
+      <label class="form-label">Opening Quantity</label><input class="form-control mb-2" name="quantity" type="number" step="0.001" min="0.001" required>
+      <label class="form-label">Opening Rate</label><input class="form-control mb-2" name="rate" type="number" step="0.0001" min="0">
+      <label class="form-label">Notes</label><textarea class="form-control mb-3" name="notes"></textarea>
+      <button class="btn btn-primary w-100">Post Opening</button>
+    </form>
+  </div>
+  <div class="col-lg-8">
+    <div class="panel">
+      <h2 class="h5">Posted Openings</h2>
+      <table class="table datatable align-middle">
+        <thead><tr><th>No</th><th>Date</th><th>Product</th><th>Warehouse</th><th>Qty</th><th>Value</th></tr></thead>
+        <tbody>{% for row in openings %}<tr><td>{{ row.opening_no }}</td><td>{{ row.opening_date }}</td><td>{{ row.product.name }}</td><td>{{ row.warehouse.name }}</td><td>{{ row.quantity }}</td><td>{{ row.value }}</td></tr>{% endfor %}</tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

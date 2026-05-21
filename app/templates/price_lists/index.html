@@ -1,1 +1,29 @@
-{% extends "base.html" %}{% block content %}<div class="row g-3"><div class="col-lg-4"><form class="panel" method="post"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><h2 class="h5">New Price List</h2><input class="form-control mb-2" name="name" placeholder="Name" required><input class="form-control mb-2" name="discount_pct" type="number" step="0.01" placeholder="Discount %"><input class="form-control mb-2" name="currency" value="INR"><textarea class="form-control mb-2" name="description" placeholder="Description"></textarea><label class="form-check mb-2"><input class="form-check-input" type="checkbox" name="is_default"> Default</label><button class="btn btn-primary">Save</button></form></div><div class="col-lg-8"><div class="panel"><table class="table datatable"><thead><tr><th>Name</th><th>Discount</th><th>Currency</th><th>Status</th><th></th></tr></thead><tbody>{% for p in price_lists %}<tr><td>{{ p.name }}</td><td>{{ p.discount_pct }}</td><td>{{ p.currency }}</td><td>{{ 'Active' if p.status else 'Inactive' }}</td><td><a class="btn btn-sm btn-outline-primary" href="{{ url_for('price_lists.edit', id=p.id) }}">Edit</a></td></tr>{% endfor %}</tbody></table></div></div></div>{% endblock %}
+{% extends "base.html" %}
+{% block content %}
+<div class="row g-3">
+  <div class="col-lg-4">
+    <form class="panel" method="post" novalidate>
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <h2 class="h5">New Price List</h2>
+      <input class="form-control mb-2" name="name" placeholder="Name" required>
+      <select class="form-select mb-2" name="price_type">{% for typ in price_types %}<option>{{ typ }}</option>{% endfor %}</select>
+      <input class="form-control mb-2" name="customer_group" placeholder="Customer group">
+      <select class="form-select mb-2" name="branch_id"><option value="">All branches</option>{% for branch in branches %}<option value="{{ branch.id }}">{{ branch.name }}</option>{% endfor %}</select>
+      <input class="form-control mb-2" name="discount_pct" type="number" step="0.01" placeholder="Discount %">
+      <input class="form-control mb-2" name="currency" value="INR">
+      <div class="row g-2 mb-2"><div class="col"><input class="form-control" type="date" name="valid_from"></div><div class="col"><input class="form-control" type="date" name="valid_to"></div></div>
+      <textarea class="form-control mb-2" name="description" placeholder="Description"></textarea>
+      <label class="form-check mb-2"><input class="form-check-input" type="checkbox" name="is_default"> Default</label>
+      <button class="btn btn-primary">Save</button>
+    </form>
+  </div>
+  <div class="col-lg-8">
+    <div class="panel">
+      <table class="table datatable align-middle">
+        <thead><tr><th>Name</th><th>Type</th><th>Branch</th><th>Discount</th><th>Validity</th><th>Status</th><th></th></tr></thead>
+        <tbody>{% for p in price_lists %}<tr><td>{{ p.name }}</td><td>{{ p.price_type }}</td><td>{{ p.branch.name if p.branch else 'All' }}</td><td>{{ p.discount_pct }}</td><td>{{ p.valid_from or '' }} - {{ p.valid_to or '' }}</td><td>{{ 'Active' if p.status else 'Inactive' }}</td><td><a class="btn btn-sm btn-outline-primary" href="{{ url_for('price_lists.edit', id=p.id) }}">Edit</a></td></tr>{% endfor %}</tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

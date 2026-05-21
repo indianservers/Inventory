@@ -1,32 +1,282 @@
 {% extends "base.html" %}
 {% block content %}
-<div class="pos-shell" data-warehouse-id="{{ warehouse.id if warehouse else '' }}" data-walkin-id="{{ walkin.id if walkin else '' }}">
-  <section class="product-browser">
-    <div class="browser-toolbar"><div class="input-group"><span class="input-group-text"><i class="bi bi-upc-scan"></i></span><input class="form-control" id="pos-search" autofocus placeholder="Scan barcode or search product [F2]"></div><button class="btn btn-outline-secondary" id="pos-clear" type="button"><i class="bi bi-x-lg"></i></button></div>
-    <div class="category-strip"><button class="category-chip active" data-category="all" type="button">All</button>{% for c in categories %}<button class="category-chip" type="button" data-category="{{ c.name|lower }}">{{ c.name }}</button>{% endfor %}</div>
-    <div class="product-grid">{% for p in products %}{% set img = p.images.filter_by(is_primary=True).first() or p.images.first() %}<button class="product-tile pos-product" type="button" data-id="{{ p.id }}" data-name="{{ p.name }}" data-rate="{{ p.sales_price }}" data-tax="{{ p.tax.rate if p.tax else 0 }}" data-stock="{{ p.current_stock }}" data-barcode="{{ p.barcode or '' }}" data-category="{{ (p.category.name if p.category else 'uncategorized')|lower }}" data-search="{{ (p.name ~ ' ' ~ p.sku ~ ' ' ~ (p.barcode or ''))|lower }}"><span class="product-art" {% if img %}style="background-image:url('{{ url_for('static', filename=img.image_path) }}')" {% endif %}>{% if not img %}<i class="bi bi-box"></i>{% endif %}</span><span class="product-info"><strong>{{ p.name }}</strong><span>Stock {{ p.current_stock }}</span></span><span class="product-price">{{ p.sales_price }}</span></button>{% endfor %}</div>
+<link href="{{ url_for('static', filename='css/pos-terminal.css') }}" rel="stylesheet">
+
+<div class="pos-terminal"
+  data-warehouse-id="{{ warehouse.id if warehouse else '' }}"
+  data-walkin-id="{{ walkin.id if walkin else '' }}"
+  data-session-id="{{ pos_session.id }}"
+  data-search-url="{{ url_for('pos.product_search') }}"
+  data-sale-url="{{ url_for('pos.sale') }}"
+  data-hold-url="{{ url_for('pos.hold_bill') }}"
+  data-held-url="{{ url_for('pos.held_bills_json') }}">
+
+  <header class="pos-topbar">
+    <div class="pos-brand-block">
+      <span class="pos-logo"><i class="bi bi-grid-1x2"></i></span>
+      <div>
+        <strong>{{ company.company_name if company else "Vyapara ERP" }}</strong>
+        <small>{{ pos_session.register.branch.name if pos_session.register and pos_session.register.branch else "Main Branch" }} · {{ pos_session.register.name if pos_session.register else "Default Register" }}</small>
+      </div>
+    </div>
+    <div class="pos-session-strip">
+      <span><small>Cashier</small>{{ current_user.name }}</span>
+      <span><small>Session</small><em class="status-dot"></em>{{ pos_session.session_no }}</span>
+      <span><small>Opened</small>{{ pos_session.opened_at.strftime('%d %b %H:%M') if pos_session.opened_at else '' }}</span>
+      <span><small>Now</small><strong id="posClock">--:--</strong></span>
+    </div>
+    <div class="pos-top-actions">
+      <button class="btn btn-outline-light" id="fullscreenBtn" type="button"><i class="bi bi-arrows-fullscreen"></i></button>
+      <button class="btn btn-outline-light" id="topHoldBtn" type="button"><i class="bi bi-pause-circle"></i> Hold</button>
+      <button class="btn btn-outline-light" id="topRecallBtn" type="button"><i class="bi bi-arrow-counterclockwise"></i> Recall</button>
+      <button class="btn btn-outline-light" data-bs-toggle="modal" data-bs-target="#cashMovementModal" type="button"><i class="bi bi-cash-stack"></i></button>
+      <a class="btn btn-outline-light" href="{{ url_for('pos.sessions') }}"><i class="bi bi-file-bar-graph"></i></a>
+      <button class="btn btn-danger" data-bs-toggle="modal" data-bs-target="#closeSessionModal" type="button"><i class="bi bi-door-closed"></i></button>
+    </div>
+  </header>
+
+  <section class="pos-control-row">
+    <div class="mode-switcher" role="tablist">
+      {% for mode in ['Retail','Supermarket','Restaurant','Services','Wholesale','Pharmacy','Electronics','Garments'] %}
+      <button type="button" class="{% if loop.first %}active{% endif %}" data-pos-mode="{{ mode|lower }}">{{ mode }}</button>
+      {% endfor %}
+    </div>
+    <select id="posCustomer" class="form-select">
+      <option value="{{ walkin.id if walkin else '' }}">Walk-in Customer</option>
+      {% for c in customers %}<option value="{{ c.id }}" data-type="{{ c.customer_type }}" data-credit="{{ c.credit_limit or 0 }}" data-outstanding="{{ c.outstanding }}">{{ c.name }}{% if c.phone %} · {{ c.phone }}{% endif %}</option>{% endfor %}
+    </select>
+    <div class="pos-search-box">
+      <i class="bi bi-upc-scan"></i>
+      <input id="posSearch" autofocus autocomplete="off" placeholder="Scan barcode or search product, SKU, batch, serial [F2]">
+      <button id="clearSearch" type="button"><i class="bi bi-x-lg"></i></button>
+    </div>
+    <div class="quick-actions dropdown">
+      <button class="btn btn-light dropdown-toggle" data-bs-toggle="dropdown">Quick Actions</button>
+      <div class="dropdown-menu dropdown-menu-end">
+        <button class="dropdown-item" id="focusCustomer" type="button">F3 Customer</button>
+        <button class="dropdown-item" id="discountFocus" type="button">F6 Bill Discount</button>
+        <button class="dropdown-item" id="openPaymentQuick" type="button">F7 Payment</button>
+        <button class="dropdown-item" id="printLastQuick" type="button">F8 Print Last Receipt</button>
+      </div>
+    </div>
   </section>
-  <aside class="cart-panel">
-    <div class="cart-head"><div><span class="eyebrow">POS</span><h2>Cart</h2></div><div class="cart-tools"><button class="btn btn-sm btn-outline-secondary" id="hold-cart" type="button">Hold</button><button class="btn btn-sm btn-outline-secondary" id="recall-cart" type="button">Recall</button></div></div>
-    <div class="p-2"><select id="pos-customer" class="form-select"><option value="{{ walkin.id if walkin else '' }}">Walk-in Customer</option>{% for c in customers %}<option value="{{ c.id }}">{{ c.name }}</option>{% endfor %}</select></div>
-    <div id="pos-cart" class="cart-dropzone"></div>
-    <div class="cart-summary">
-      <div><span>Subtotal</span><input id="pos-subtotal" readonly value="0.00"></div>
-      <div><span>Discount</span><input id="pos-discount" type="number" step="0.01" value="0"></div>
-      <div><span>Tax</span><input id="pos-tax" readonly value="0.00"></div>
-      <div class="summary-total"><span>Total</span><input id="pos-total" readonly value="0.00"></div>
-    </div>
-    <div class="p-2 d-grid gap-2">
-      <div class="btn-group"><button class="btn btn-outline-primary pay-mode active" data-mode="Cash" type="button">Cash</button><button class="btn btn-outline-primary pay-mode" data-mode="Card" type="button">Card</button><button class="btn btn-outline-primary pay-mode" data-mode="UPI" type="button">UPI</button><button class="btn btn-outline-primary pay-mode" data-mode="Split" type="button">Split</button></div>
-      <input class="form-control" id="cash-tendered" type="number" step="0.01" placeholder="Cash tendered">
-      <input class="form-control" id="card-amount" type="number" step="0.01" placeholder="Card amount">
-      <input class="form-control" id="upi-amount" type="number" step="0.01" placeholder="UPI amount">
-      <input class="form-control" id="reference-no" placeholder="Card/UPI reference">
-      <button class="btn btn-success btn-lg" id="charge-btn" type="button">CHARGE [F12]</button>
-      <form method="post" action="{{ url_for('pos.close_session') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><div class="input-group"><input class="form-control" name="closing_cash" placeholder="Closing cash"><button class="btn btn-outline-danger">Close</button></div></form>
-    </div>
-  </aside>
+
+  <main class="pos-workspace">
+    <section class="pos-products-zone">
+      <div class="category-ribbon">
+        <button class="active" data-category="all" type="button">All</button>
+        {% for c in categories %}<button data-category="{{ c.name|lower }}" type="button">{{ c.name }}</button>{% endfor %}
+      </div>
+      <div class="mode-panel" id="modePanel">
+        <div data-mode-panel="restaurant" hidden>
+          <strong>Restaurant</strong>
+          <select class="form-select form-select-sm"><option>Dine-in</option><option>Takeaway</option><option>Delivery</option></select>
+          <input class="form-control form-control-sm" placeholder="Table / token">
+          <input class="form-control form-control-sm" placeholder="Kitchen note">
+          <button class="btn btn-sm btn-outline-primary" type="button">KOT</button>
+          <button class="btn btn-sm btn-outline-primary" type="button">Split Bill</button>
+        </div>
+        <div data-mode-panel="services" hidden>
+          <strong>Services</strong>
+          <input class="form-control form-control-sm" placeholder="Staff / stylist">
+          <input class="form-control form-control-sm" placeholder="Appointment ref">
+        </div>
+        <div data-mode-panel="pharmacy" hidden>
+          <strong>Pharmacy</strong>
+          <input class="form-control form-control-sm" placeholder="Prescription ref">
+          <span class="status-badge badge-low">Batch / expiry required</span>
+        </div>
+        <div data-mode-panel="electronics" hidden>
+          <strong>Electronics</strong>
+          <input class="form-control form-control-sm" placeholder="Warranty months">
+          <span class="status-badge badge-muted">Serial tracking focus</span>
+        </div>
+        <div data-mode-panel="garments" hidden>
+          <strong>Garments</strong>
+          <input class="form-control form-control-sm" placeholder="Size / color lookup">
+        </div>
+        <div data-mode-panel="wholesale" hidden>
+          <strong>Wholesale</strong>
+          <span class="status-badge badge-muted">Customer pricing · bulk discount · credit warning</span>
+        </div>
+      </div>
+      <div class="product-section-head">
+        <div><strong>Products</strong><small>Tap, scan or press Enter to add</small></div>
+        <span id="visibleProductCount">{{ products|length }} items</span>
+      </div>
+      <div class="product-grid premium-grid" id="productGrid">
+        {% for p in products %}
+          {% set img = p.images.filter_by(is_primary=True).first() or p.images.first() %}
+          <article class="premium-product-card pos-product {% if p.current_stock|float <= 0 and p.track_inventory %}out{% endif %}" role="button" tabindex="0"
+            data-id="{{ p.id }}" data-name="{{ p.name }}" data-sku="{{ p.sku }}" data-barcode="{{ p.barcode or '' }}"
+            data-rate="{{ p.sales_price }}" data-tax="{{ p.tax.rate if p.tax else 0 }}" data-tax-name="{{ p.tax.name if p.tax else 'No Tax' }}"
+            data-stock="{{ p.current_stock }}" data-track-inventory="{{ 1 if p.track_inventory else 0 }}"
+            data-batch="{{ 1 if p.batch_tracking else 0 }}" data-serial="{{ 1 if p.serial_tracking else 0 }}"
+            data-expiry="{{ 1 if p.expiry_tracking else 0 }}" data-decimal="{{ 1 if p.unit and p.unit.decimal_allowed else 0 }}"
+            data-category="{{ (p.category.name if p.category else 'uncategorized')|lower }}"
+            data-search="{{ (p.name ~ ' ' ~ p.sku ~ ' ' ~ (p.barcode or '') ~ ' ' ~ (p.category.name if p.category else ''))|lower }}">
+            <span class="product-image" {% if img %}style="background-image:url('{{ url_for('static', filename=img.image_path) }}')" {% endif %}>{% if not img %}<i class="bi bi-box-seam"></i>{% endif %}</span>
+            <span class="product-body">
+              <strong>{{ p.name }}</strong>
+              <small>{{ p.sku }}</small>
+              <span class="product-badges">
+                <em class="{{ 'low' if p.is_low_stock else 'ok' }}">{{ p.current_stock }} in stock</em>
+                <em>{{ p.tax.rate if p.tax else 0 }}% tax</em>
+              </span>
+            </span>
+            <span class="product-price">₹{{ "%.2f"|format(p.sales_price|float) }}</span>
+            <span class="favorite-star"><i class="bi bi-star"></i></span>
+            <span class="product-cart-actions" aria-label="Cart quantity controls">
+              <button class="tile-minus" data-product-minus type="button" aria-label="Remove one {{ p.name }}"><i class="bi bi-dash-lg"></i></button>
+              <strong data-product-count>0</strong>
+              <button class="tile-plus" data-product-plus type="button" aria-label="Add {{ p.name }} to cart"><i class="bi bi-plus-lg"></i></button>
+            </span>
+          </article>
+        {% endfor %}
+      </div>
+    </section>
+
+    <aside class="pos-cart-zone">
+      <div class="cart-zone-head">
+        <div><span class="eyebrow">Active bill</span><h2>Cart</h2></div>
+        <button class="btn btn-sm btn-outline-secondary" id="cartNoteBtn" type="button"><i class="bi bi-card-text"></i> Notes</button>
+      </div>
+      <div id="cartItems" class="cart-items"></div>
+      <div class="cart-empty" id="cartEmpty">
+        <i class="bi bi-basket2"></i>
+        <strong>Ready for the first scan</strong>
+        <small>Barcode input is focused. Scan or tap an item to start.</small>
+      </div>
+      <div class="cart-summary-box">
+        <div><span>Subtotal</span><strong id="subtotalValue">0.00</strong></div>
+        <div><span>Line discount</span><strong id="lineDiscountValue">0.00</strong></div>
+        <div><span>Bill discount</span><input id="billDiscount" type="number" min="0" step="0.01" value="0"></div>
+        <div><span>Coupon discount</span><strong id="couponDiscountValue">0.00</strong></div>
+        <div><span>Taxable value</span><strong id="taxableValue">0.00</strong></div>
+        <div><span>Tax</span><strong id="taxValue">0.00</strong></div>
+        <div><span>Round off</span><strong id="roundOffValue">0.00</strong></div>
+        <div class="grand"><span>Grand total</span><strong id="grandTotalValue">0.00</strong></div>
+      </div>
+      <div class="cart-addons">
+        <input class="form-control" id="couponCode" placeholder="Coupon code">
+        <input class="form-control" id="cartNotes" placeholder="Bill note / delivery instruction">
+      </div>
+    </aside>
+  </main>
+
+  <footer class="pos-checkout-bar">
+    <div class="checkout-metric"><small>Items</small><strong id="totalItems">0</strong></div>
+    <div class="checkout-metric"><small>Quantity</small><strong id="totalQty">0</strong></div>
+    <div class="checkout-payable"><small>Amount Payable</small><strong id="checkoutPayable">₹0.00</strong></div>
+    <button class="btn btn-outline-light" id="bottomHoldBtn" type="button"><i class="bi bi-pause-circle"></i> Hold</button>
+    <button class="btn btn-outline-light" id="clearCartBtn" type="button"><i class="bi bi-trash3"></i> Clear</button>
+    <button class="btn btn-light" id="printLastBtn" type="button"><i class="bi bi-printer"></i> Print Last</button>
+    <button class="btn btn-success btn-lg" id="paymentBtn" type="button"><i class="bi bi-credit-card"></i> Payment [F7]</button>
+  </footer>
 </div>
-<div class="modal fade" id="receiptModal" tabindex="-1"><div class="modal-dialog"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">Receipt</h5></div><div class="modal-body" id="receiptBody"></div><div class="modal-footer"><a class="btn btn-outline-secondary" id="printReceipt" target="_blank">Print</a><button class="btn btn-primary" data-bs-dismiss="modal">Done</button></div></div></div></div>
+
+<div class="modal fade" id="paymentModal" tabindex="-1">
+  <div class="modal-dialog modal-xl modal-dialog-centered"><div class="modal-content premium-modal">
+    <div class="modal-header"><div><span class="eyebrow">Checkout</span><h5 class="modal-title">Complete Payment</h5></div><button class="btn-close" data-bs-dismiss="modal" type="button"></button></div>
+    <div class="modal-body payment-layout">
+      <section>
+        <div class="payment-total-card"><small>Grand Total</small><strong id="payGrandTotal">₹0.00</strong><span id="creditWarning"></span></div>
+        <div class="mode-switcher payment-modes mt-3">
+          {% for mode in ["Cash", "Card", "UPI", "Wallet", "Credit", "Split"] %}<button type="button" class="{% if loop.first %}active{% endif %}" data-payment-mode="{{ mode }}">{{ mode }}</button>{% endfor %}
+        </div>
+        <div id="paymentRows" class="payment-rows mt-3"></div>
+        <button class="btn btn-outline-primary mt-2" id="addPaymentRow" type="button"><i class="bi bi-plus-lg"></i> Add payment mode</button>
+        <div class="row g-2 mt-2">
+          <div class="col-md-6"><label class="form-label">Reference number<input class="form-control" id="paymentReference" placeholder="Card / UPI / wallet reference"></label></div>
+          <div class="col-md-6"><label class="form-label">Credit due date<input class="form-control" id="creditDueDate" type="date"></label></div>
+        </div>
+      </section>
+      <aside class="payment-summary-panel">
+        <div class="summary-line"><span>Amount received</span><strong id="amountReceived">0.00</strong></div>
+        <div class="summary-line"><span>Balance due</span><strong id="balanceDue">0.00</strong></div>
+        <div class="summary-line"><span>Change due</span><strong id="paymentChangeDue">0.00</strong></div>
+        <button class="btn btn-success btn-lg w-100 mt-3 complete-sale" data-after="done" type="button">Complete Sale</button>
+        <button class="btn btn-outline-primary w-100 complete-sale" data-after="print" type="button">Complete + Print</button>
+        <button class="btn btn-outline-secondary w-100 complete-sale" data-after="whatsapp" type="button">Complete + WhatsApp</button>
+        <button class="btn btn-outline-secondary w-100 complete-sale" data-after="email" type="button">Complete + Email</button>
+      </aside>
+    </div>
+  </div></div>
+</div>
+
+<div class="modal fade" id="recallModal" tabindex="-1">
+  <div class="modal-dialog modal-lg modal-dialog-centered"><div class="modal-content premium-modal">
+    <div class="modal-header"><div><span class="eyebrow">Held bills</span><h5 class="modal-title">Recall Bill</h5></div><button class="btn-close" data-bs-dismiss="modal" type="button"></button></div>
+    <div class="modal-body">
+      <input class="form-control mb-3" id="heldSearch" placeholder="Search hold number, customer or note">
+      <div id="heldBillsList" class="held-list"><div class="text-muted py-4 text-center">Loading held bills...</div></div>
+    </div>
+  </div></div>
+</div>
+
+<div class="modal fade" id="productSelectModal" tabindex="-1">
+  <div class="modal-dialog modal-lg modal-dialog-centered"><div class="modal-content premium-modal">
+    <div class="modal-header"><h5 class="modal-title">Choose Product</h5><button class="btn-close" data-bs-dismiss="modal" type="button"></button></div>
+    <div class="modal-body" id="productSelectList"></div>
+  </div></div>
+</div>
+
+<div class="modal fade" id="lineDetailModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered"><div class="modal-content premium-modal">
+    <div class="modal-header"><h5 class="modal-title" id="lineDetailTitle">Item Details</h5><button class="btn-close" data-bs-dismiss="modal" type="button"></button></div>
+    <div class="modal-body d-grid gap-2">
+      <label class="form-label">Quantity<input class="form-control" id="detailQty" type="number" min="0.001" step="0.001"></label>
+      <label class="form-label batch-field">Batch<select class="form-select" id="detailBatch"></select></label>
+      <label class="form-label serial-field">Serial<select class="form-select" id="detailSerial"></select></label>
+      <label class="form-label">Item note<input class="form-control" id="detailNote" placeholder="Kitchen note, warranty, prescription, alteration"></label>
+    </div>
+    <div class="modal-footer"><button class="btn btn-primary" id="saveLineDetail" type="button">Apply</button></div>
+  </div></div>
+</div>
+
+<div class="modal fade" id="successModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered"><div class="modal-content premium-modal success-modal">
+    <div class="modal-body text-center">
+      <i class="bi bi-check-circle-fill"></i>
+      <h3>Sale completed</h3>
+      <p id="successText"></p>
+      <div class="d-grid gap-2">
+        <a class="btn btn-primary" id="successPrint" target="_blank">Print Receipt</a>
+        <button class="btn btn-outline-secondary" data-bs-dismiss="modal" type="button">New Sale</button>
+      </div>
+    </div>
+  </div></div>
+</div>
+
+<div class="modal fade" id="cashMovementModal" tabindex="-1">
+  <div class="modal-dialog"><form class="modal-content premium-modal" method="post" action="{{ url_for('pos.cash_movement') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div class="modal-header"><h5 class="modal-title">Cash Drawer Movement</h5><button class="btn-close" data-bs-dismiss="modal" type="button"></button></div>
+    <div class="modal-body row g-2">
+      <div class="col-6"><label class="form-label">Type</label><select class="form-select" name="movement_type"><option>Withdrawal</option><option>Cash In</option></select></div>
+      <div class="col-6"><label class="form-label">Amount</label><input class="form-control" name="amount" type="number" min="0.01" step="0.01" required></div>
+      <div class="col-12"><label class="form-label">Reason</label><input class="form-control" name="reason" required></div>
+    </div>
+    <div class="modal-footer"><button class="btn btn-primary">Record Movement</button></div>
+  </form></div>
+</div>
+
+<div class="modal fade" id="closeSessionModal" tabindex="-1">
+  <div class="modal-dialog"><form class="modal-content premium-modal" method="post" action="{{ url_for('pos.close_session') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div class="modal-header"><h5 class="modal-title">Close POS Session</h5><button class="btn-close" data-bs-dismiss="modal" type="button"></button></div>
+    <div class="modal-body">
+      <div class="summary-line"><span>Opening cash</span><strong>{{ pos_session.opening_cash }}</strong></div>
+      <div class="summary-line"><span>Cash sales</span><strong>{{ pos_session.total_cash }}</strong></div>
+      <div class="summary-line"><span>Card</span><strong>{{ pos_session.total_card }}</strong></div>
+      <div class="summary-line"><span>UPI</span><strong>{{ pos_session.total_upi }}</strong></div>
+      <label class="form-label mt-3">Actual counted cash<input class="form-control form-control-lg" name="closing_cash" type="number" min="0" step="0.01" required></label>
+      <label class="form-label">Closing notes<input class="form-control" name="notes" placeholder="Optional notes"></label>
+    </div>
+    <div class="modal-footer"><button class="btn btn-danger">Close Session & View Z-report</button></div>
+  </form></div>
+</div>
+
+<div class="toast-container position-fixed bottom-0 end-0 p-3" id="posToastHost"></div>
 {% endblock %}
-{% block scripts %}<script src="{{ url_for('static', filename='js/pos.js') }}"></script>{% endblock %}
+{% block scripts %}<script src="{{ url_for('static', filename='js/pos-terminal.js') }}"></script>{% endblock %}

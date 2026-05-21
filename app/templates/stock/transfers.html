@@ -6,14 +6,23 @@
     <a class="btn btn-primary" href="{{ url_for('stock.transfer_create') }}"><i class="bi bi-arrow-left-right"></i> Transfer</a>
   </div>
   <table class="table datatable align-middle">
-    <thead><tr><th>No</th><th>Date</th><th>From</th><th>To</th><th>Status</th><th>Items</th></tr></thead>
+    <thead><tr><th>No</th><th>Date</th><th>From</th><th>To</th><th>Status</th><th>Items</th><th></th></tr></thead>
     <tbody>{% for transfer in transfers %}<tr>
       <td>{{ transfer.transfer_no }}</td>
       <td>{{ transfer.transfer_date }}</td>
       <td>{{ transfer.from_warehouse.name }}</td>
       <td>{{ transfer.to_warehouse.name }}</td>
-      <td><span class="badge text-bg-success">{{ transfer.status }}</span></td>
+      <td><span class="badge text-bg-{{ 'success' if transfer.status == 'Received' else 'warning' if transfer.status == 'Sent' else 'secondary' }}">{{ transfer.status }}</span></td>
       <td>{{ transfer.items.count() }}</td>
+      <td class="text-end">
+        {% if transfer.status == 'Draft' %}
+        <form class="d-inline" method="post" action="{{ url_for('stock.transfer_send', id=transfer.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn btn-sm btn-outline-primary">Send</button></form>
+        <form class="d-inline" method="post" action="{{ url_for('stock.transfer_receive', id=transfer.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn btn-sm btn-outline-success">Receive</button></form>
+        <form class="d-inline" method="post" action="{{ url_for('stock.transfer_cancel', id=transfer.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn btn-sm btn-outline-danger">Cancel</button></form>
+        {% elif transfer.status == 'Sent' %}
+        <form class="d-inline" method="post" action="{{ url_for('stock.transfer_receive', id=transfer.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn btn-sm btn-outline-success">Receive</button></form>
+        {% endif %}
+      </td>
     </tr>{% endfor %}</tbody>
   </table>
 </div>

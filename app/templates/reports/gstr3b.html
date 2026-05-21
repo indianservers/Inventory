@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="panel mb-3 print-hide">
+  <form class="row g-2 align-items-end">
+    <div class="col-md-2"><label class="form-label">Month</label><input class="form-control" type="number" min="1" max="12" name="month" value="{{ month }}"></div>
+    <div class="col-md-2"><label class="form-label">Year</label><input class="form-control" type="number" name="year" value="{{ year }}"></div>
+    <div class="col-md-2"><label class="form-label">Quarter</label><select class="form-select" name="quarter"><option value="">Monthly</option>{% for q in [1,2,3,4] %}<option value="{{ q }}" {% if quarter == q|string %}selected{% endif %}>Q{{ q }}</option>{% endfor %}</select></div>
+    <div class="col-md-6 d-flex gap-2"><button class="btn btn-primary">Preview</button><a class="btn btn-outline-success" href="{{ url_for('reports.gstr3b_report', month=month, year=year, quarter=quarter, export='xlsx') }}">Export Excel</a><a class="btn btn-outline-primary" href="{{ url_for('reports.gstr3b_report', month=month, year=year, quarter=quarter, download='json') }}">Download JSON</a><button class="btn btn-outline-secondary" type="button" onclick="window.print()">Print</button></div>
+  </form>
+</div>
+<div class="panel">
+  <h2 class="h5">GSTR-3B Summary</h2>
+  <table class="table table-bordered align-middle">
+    <thead><tr><th>Section</th><th class="text-end">Amount</th></tr></thead>
+    <tbody>
+    {% for key, value in summary.items() %}
+      <tr><td>{{ key|replace("_"," ")|title }}</td><td class="text-end">{{ "%.2f"|format(value) }}</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

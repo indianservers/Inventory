@@ -2,7 +2,8 @@ import os
 from pathlib import Path
 
 import pymysql
-from flask import Flask, render_template
+from flask import Flask, abort, render_template, request
+from flask_login import current_user
 
 from config import get_config
 from app.extensions import csrf, db, login_manager, migrate
@@ -56,15 +57,60 @@ def create_app():
 
     ensure_invoice_schema(app)
 
+    @app.before_request
+    def enforce_role_permissions():
+        if request.endpoint in {None, "static"} or request.endpoint.startswith("static"):
+            return None
+        if request.endpoint.startswith("auth.") or request.endpoint in PUBLIC_ENDPOINTS:
+            return None
+        if not current_user.is_authenticated:
+            return None
+        if not current_user.is_active:
+            abort(403)
+        module = _permission_module(request.endpoint)
+        if not module:
+            return None
+        action = _permission_action(request.endpoint, request.method)
+        if not current_user.has_permission(module, action):
+            try:
+                from app.models import AuditLog
+
+                db.session.add(AuditLog(user_id=current_user.id, action="Permission Denied", module=module, record_id=None, ip_address=request.remote_addr, user_agent=request.user_agent.string[:255]))
+                db.session.commit()
+            except Exception:
+                db.session.rollback()
+            abort(403)
+        return None
+
+    @app.after_request
+    def add_security_headers(response):
+        response.headers.setdefault("X-Frame-Options", "SAMEORIGIN")
+        response.headers.setdefault("X-Content-Type-Options", "nosniff")
+        response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+        response.headers.setdefault(
+            "Content-Security-Policy",
+            "default-src 'self'; "
+            "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdn.datatables.net https://code.jquery.com https://checkout.razorpay.com; "
+            "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdn.datatables.net; "
+            "font-src 'self' https://cdn.jsdelivr.net data:; "
+            "img-src 'self' data: https:; "
+            "connect-src 'self' https://api.razorpay.com https://graph.facebook.com;",
+        )
+        return response
+
     @app.context_processor
     def inject_globals():
-        from app.models import CompanySetting
+        from app.models import Branch, Company, CompanySetting, CustomModule
 
         try:
-            company = CompanySetting.query.first()
+            company = Company.query.filter_by(is_active=True).first() or CompanySetting.query.first()
+            branches = Branch.query.filter_by(status=True).order_by(Branch.name).all()
+            custom_modules_nav = CustomModule.query.filter_by(is_active=True, show_in_sidebar=True).order_by(CustomModule.name).all()
         except Exception:
             company = None
-        return {"company": company, "app_name": "Vyapara ERP"}
+            branches = []
+            custom_modules_nav = []
+        return {"company": company, "branches": branches, "custom_modules_nav": custom_modules_nav, "app_name": "Vyapara ERP"}
 
     @app.errorhandler(400)
     def bad_request(error):
@@ -113,4 +159,66 @@ def create_app():
         sent = send_due_reports()
         print(f"Sent {len(sent)} scheduled report(s).")
 
+    @app.cli.group("scheduler")
+    def scheduler_cli():
+        """Automation and scheduled job runner."""
+
+    @scheduler_cli.command("run")
+    def scheduler_run():
+        from app.services.scheduler_service import run_scheduled_jobs
+
+        logs = run_scheduled_jobs()
+        print(f"Ran {len(logs)} scheduled job(s).")
+
     return app
+
+
+PUBLIC_ENDPOINTS = {
+    "invoices.pay",
+    "invoices.create_order",
+    "invoices.payment_callback",
+}
+
+
+def _permission_module(endpoint):
+    blueprint = endpoint.split(".", 1)[0]
+    mapping = {
+        "dashboard": "dashboard",
+        "products": "products",
+        "masters": "settings",
+        "price_lists": "products",
+        "parties": "sales",
+        "purchases": "purchases",
+        "purchase_orders": "purchases",
+        "invoices": "sales",
+        "sales": "sales",
+        "notes": "sales",
+        "recurring": "sales",
+        "manufacturing": "inventory",
+        "stock": "inventory",
+        "pos": "pos",
+        "accounts": "accounts",
+        "reports": "reports",
+        "settings": "settings",
+        "integrations": "settings",
+        "api": "products",
+        "search": "dashboard",
+    }
+    return mapping.get(blueprint)
+
+
+def _permission_action(endpoint, method):
+    name = endpoint.rsplit(".", 1)[-1]
+    if any(word in name for word in ["delete", "toggle", "cancel", "revoke", "disable"]):
+        return "delete"
+    if method == "GET":
+        if name.endswith(("print", "pdf", "receipt")):
+            return "print"
+        if "export" in name:
+            return "export"
+        return "view"
+    if any(word in name for word in ["edit", "update", "permissions", "default", "approve"]):
+        return "edit"
+    if any(word in name for word in ["print", "pdf"]):
+        return "print"
+    return "create"

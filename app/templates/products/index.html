@@ -1,25 +1,187 @@
 {% extends "base.html" %}
 {% block content %}
-<div class="panel">
-  <div class="d-flex flex-wrap justify-content-between gap-2 mb-3">
-    <h2 class="h5 mb-0">Product Master</h2>
-    <div class="d-flex flex-wrap gap-2">
-      <a class="btn btn-outline-secondary" href="{{ url_for('products.import_products') }}"><i class="bi bi-upload"></i> Import</a>
-      <a class="btn btn-outline-secondary" href="{{ url_for('products.export') }}"><i class="bi bi-filetype-csv"></i> CSV</a>
-      <a class="btn btn-outline-secondary" href="{{ url_for('products.export', format='xlsx') }}"><i class="bi bi-file-earmark-excel"></i> Excel</a>
-      <a class="btn btn-primary" href="{{ url_for('products.create') }}"><i class="bi bi-plus-lg"></i> Product</a>
-    </div>
+<div class="detail-hero item-hero">
+  <div>
+    <span class="eyebrow">Inventory command center</span>
+    <h2>Item Master</h2>
+    <p>Manage saleable products, services, variants, batches, serials, pricing and POS behavior from one fast workspace.</p>
   </div>
-  <form class="row g-2 mb-3" method="get">
-    <div class="col-md-10"><input class="form-control" name="q" value="{{ search or '' }}" placeholder="Search SKU, barcode, name, HSN, rack/bin"></div>
-    <div class="col-md-2 d-grid"><button class="btn btn-outline-primary"><i class="bi bi-search"></i> Search</button></div>
-  </form>
-  <table class="table datatable align-middle">
-    <thead><tr><th>SKU</th><th>Barcode</th><th>Name</th><th>Rack/Bin</th><th>Category</th><th>Purchase</th><th>Sale</th><th>Stock</th><th>Status</th><th></th></tr></thead>
-    <tbody>{% for p in products %}<tr>
-      <td>{{ p.sku }}</td><td>{{ p.barcode or '' }}</td><td>{{ p.name }}</td><td>{{ p.rack_bin or '' }}</td><td>{{ p.category.name if p.category }}</td><td>{{ p.purchase_price }}</td><td>{{ p.sales_price }}</td><td><span class="badge text-bg-{{ 'warning' if p.is_low_stock else 'light' }}">{{ p.current_stock }}</span></td><td>{{ 'Active' if p.is_active else 'Inactive' }}</td>
-      <td class="table-actions"><a class="btn btn-sm btn-outline-secondary" href="{{ url_for('products.qr_label', id=p.id) }}"><i class="bi bi-qr-code"></i></a><a class="btn btn-sm btn-outline-primary" href="{{ url_for('products.edit', id=p.id) }}"><i class="bi bi-pencil"></i></a><a class="btn btn-sm btn-outline-danger" data-confirm="Mark product inactive?" href="{{ url_for('products.delete', id=p.id) }}"><i class="bi bi-trash"></i></a></td>
-    </tr>{% endfor %}</tbody>
-  </table>
+  <div class="hero-actions">
+    <a class="btn btn-outline-secondary" href="{{ url_for('products.import_products') }}"><i class="bi bi-upload"></i> Import</a>
+    <a class="btn btn-outline-secondary" href="{{ url_for('products.export', format='xlsx') }}"><i class="bi bi-file-earmark-excel"></i> Export</a>
+    <a class="btn btn-outline-secondary" href="{{ url_for('products.barcode_labels') }}"><i class="bi bi-upc-scan"></i> Barcode Labels</a>
+    <a class="btn btn-primary" href="{{ url_for('products.create') }}"><i class="bi bi-plus-lg"></i> New Item</a>
+  </div>
+</div>
+
+<div class="item-master-layout">
+  <aside class="item-list-panel">
+    <form class="item-filter-stack" method="get">
+      <div class="input-group">
+        <span class="input-group-text"><i class="bi bi-search"></i></span>
+        <input class="form-control" name="q" value="{{ search or '' }}" placeholder="Search name, SKU, barcode, HSN">
+      </div>
+      <select class="form-select" name="category_id">
+        <option value="">All categories</option>
+        {% for category in categories %}<option value="{{ category.id }}" {% if category_id|string == category.id|string %}selected{% endif %}>{{ category.name }}</option>{% endfor %}
+      </select>
+      <select class="form-select" name="stock_status">
+        {% for value,label in [("all","All stock"),("low","Low stock"),("out","Out of stock"),("active","Active"),("inactive","Inactive")] %}
+        <option value="{{ value }}" {% if stock_status == value %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+      <button class="btn btn-outline-primary w-100"><i class="bi bi-funnel"></i> Apply Filters</button>
+    </form>
+    <div class="bulk-action-bar">
+      <button class="btn btn-sm btn-light" disabled>Price</button>
+      <button class="btn btn-sm btn-light" disabled>Tax</button>
+      <button class="btn btn-sm btn-light" disabled>Category</button>
+      <button class="btn btn-sm btn-light" disabled>Status</button>
+    </div>
+    <div class="item-list">
+      {% for p in products %}
+      <a class="item-list-row {% if selected_product and selected_product.id == p.id %}active{% endif %}" href="{{ url_for('products.index', selected=p.id, q=search, category_id=category_id, stock_status=stock_status) }}">
+        <span class="item-avatar">{{ p.name[:1] }}</span>
+        <span>
+          <strong>{{ p.name }}</strong>
+          <small>{{ p.sku }}{% if p.barcode %} · {{ p.barcode }}{% endif %}</small>
+        </span>
+        <em class="status-badge {{ 'badge-low' if p.is_low_stock else ('badge-muted' if not p.is_active else 'badge-ok') }}">{{ 'Low' if p.is_low_stock else ('Inactive' if not p.is_active else 'Active') }}</em>
+      </a>
+      {% else %}
+      <div class="empty-state compact"><i class="bi bi-box"></i><strong>No items found</strong><small>Try a different filter or create a new item.</small></div>
+      {% endfor %}
+    </div>
+  </aside>
+
+  {% if selected_product %}
+  {% set p = selected_product %}
+  {% set img = p.images.filter_by(is_primary=True).first() or p.images.first() %}
+  <section class="item-detail-panel">
+    <div class="item-title-row">
+      <div class="item-image-card">
+        {% if img %}<img src="{{ url_for('static', filename=img.image_path) }}" alt="{{ p.name }}">{% else %}<i class="bi bi-box-seam"></i>{% endif %}
+      </div>
+      <div>
+        <span class="eyebrow">{{ p.category.name if p.category else 'Uncategorized' }}</span>
+        <h2>{{ p.name }}</h2>
+        <div class="d-flex flex-wrap gap-2">
+          <span class="status-badge badge-muted">SKU {{ p.sku }}</span>
+          <span class="status-badge badge-muted">Barcode {{ p.barcode or 'Not set' }}</span>
+          <span class="status-badge {{ 'badge-ok' if p.track_inventory else 'badge-muted' }}">{{ 'Inventory' if p.track_inventory else 'Service' }}</span>
+        </div>
+      </div>
+      <div class="ms-auto d-flex gap-2">
+        <a class="btn btn-outline-secondary" href="{{ url_for('products.qr_label', id=p.id) }}"><i class="bi bi-qr-code"></i></a>
+        <a class="btn btn-primary" href="{{ url_for('products.edit', id=p.id) }}"><i class="bi bi-pencil"></i> Edit</a>
+      </div>
+    </div>
+
+    <ul class="nav nav-pills tab-nav mt-3" role="tablist">
+      {% for tab in ["Overview","Warehouses","Transactions","Batches / Serials","Pricing","POS Preferences","History","Attachments"] %}
+      <li class="nav-item"><button class="nav-link {% if loop.first %}active{% endif %}" data-bs-toggle="pill" data-bs-target="#tab-{{ loop.index }}" type="button">{{ tab }}</button></li>
+      {% endfor %}
+    </ul>
+    <div class="tab-content mt-3">
+      <div class="tab-pane fade show active" id="tab-1">
+        <div class="info-grid">
+          {% for label,value in [
+            ("Item Type", "Inventory" if p.track_inventory else "Service"),
+            ("Brand", p.brand.name if p.brand else "Not set"),
+            ("Unit", p.unit.short_name if p.unit else "Not set"),
+            ("HSN/SAC", p.hsn_code or "Not set"),
+            ("Tax Preference", p.tax.name if p.tax else "Non-taxable"),
+            ("Purchase Price", p.purchase_price),
+            ("Sales Price", p.sales_price),
+            ("MRP", p.mrp),
+            ("Preferred Supplier", p.preferred_supplier.name if p.preferred_supplier else "Not set"),
+            ("Inventory Account", "Inventory Asset"),
+            ("Sales Account", "Sales"),
+            ("Purchase Account", "Purchases"),
+            ("Valuation Method", company.stock_valuation_method if company and company.stock_valuation_method is defined else "Weighted Average")
+          ] %}
+          <div><small>{{ label }}</small><strong>{{ value }}</strong></div>
+          {% endfor %}
+        </div>
+      </div>
+      <div class="tab-pane fade" id="tab-2">
+        <div class="data-card"><strong>{{ p.warehouse.name if p.warehouse else 'Default warehouse not set' }}</strong><span>Stock {{ p.current_stock }} · Value {{ "%.2f"|format(p.stock_value|float) }}</span></div>
+      </div>
+      <div class="tab-pane fade" id="tab-3">
+        <div class="empty-state compact"><i class="bi bi-clock-history"></i><strong>Transactions are available in stock movement reports.</strong><a href="{{ url_for('reports.stock_movement_report') }}">Open movement report</a></div>
+      </div>
+      <div class="tab-pane fade" id="tab-4">
+        <div class="info-grid">
+          <div><small>Batch Tracking</small><strong>{{ 'Enabled' if p.batch_tracking else 'Disabled' }}</strong></div>
+          <div><small>Serial Tracking</small><strong>{{ 'Enabled' if p.serial_tracking else 'Disabled' }}</strong></div>
+          <div><small>Expiry Tracking</small><strong>{{ 'Enabled' if p.expiry_tracking else 'Disabled' }}</strong></div>
+        </div>
+      </div>
+      <div class="tab-pane fade" id="tab-5">
+        <div class="info-grid">
+          <div><small>Retail</small><strong>{{ p.sales_price }}</strong></div>
+          <div><small>Wholesale</small><strong>Use price lists</strong></div>
+          <div><small>Discount price</small><strong>{{ p.mrp|float - p.sales_price|float if p.mrp else 0 }}</strong></div>
+        </div>
+      </div>
+      <div class="tab-pane fade" id="tab-6">
+        <div class="toggle-grid">
+          {% for label,enabled in [
+            ("Allowed discount %", true),
+            ("Restrict selling price edit", false),
+            ("Require quantity before cart", false),
+            ("Allow weighing scale quantity", false),
+            ("Allow decimal quantity", true),
+            ("Show in POS", p.is_active),
+            ("Restaurant modifiers", false),
+            ("Quick sale item", false),
+            ("Favorite item", false)
+          ] %}
+          <span><i class="bi bi-{{ 'check-circle-fill text-success' if enabled else 'dash-circle text-muted' }}"></i> {{ label }}</span>
+          {% endfor %}
+        </div>
+      </div>
+      <div class="tab-pane fade" id="tab-7">
+        <div class="activity-timeline">
+          <div><span></span><strong>Created</strong><small>{{ p.created_at }}</small></div>
+          <div><span></span><strong>Last updated</strong><small>{{ p.updated_at }}</small></div>
+        </div>
+      </div>
+      <div class="tab-pane fade" id="tab-8">
+        <div class="empty-state compact"><i class="bi bi-images"></i><strong>{{ p.images.count() }} image attachment(s)</strong><a href="{{ url_for('products.edit', id=p.id) }}">Manage attachments</a></div>
+      </div>
+    </div>
+  </section>
+
+  <aside class="item-summary-panel">
+    <h3 class="h6">Stock & Fulfillment</h3>
+    {% set opening = p.opening_stock|float %}
+    {% set onhand = p.current_stock|float %}
+    {% set committed = 0 %}
+    {% set received = 0 %}
+    {% for label,value in [
+      ("Opening stock", opening),
+      ("Accounting stock", onhand),
+      ("Physical stock", onhand),
+      ("Stock on hand", onhand),
+      ("Committed stock", committed),
+      ("Available for sale", onhand - committed),
+      ("To be shipped", 0),
+      ("To be received", received),
+      ("To be invoiced", 0),
+      ("To be billed", 0),
+      ("Reorder level", p.reorder_level)
+    ] %}
+    <div class="summary-line"><span>{{ label }}</span><strong>{{ value }}</strong></div>
+    {% endfor %}
+    {% if p.is_low_stock %}<div class="alert alert-warning mt-3 mb-0"><i class="bi bi-exclamation-triangle"></i> Low stock warning. Create a reorder suggestion or purchase order.</div>{% endif %}
+    <div class="d-grid gap-2 mt-3">
+      <a class="btn btn-outline-primary" href="{{ url_for('stock.reorder_suggestions') }}">Reorder</a>
+      <a class="btn btn-outline-secondary" href="{{ url_for('stock.adjustments') }}">Adjust Stock</a>
+    </div>
+  </aside>
+  {% else %}
+  <section class="item-detail-panel full-empty"><div class="empty-state"><i class="bi bi-box-seam"></i><strong>No products yet</strong><small>Create your first item to start billing and tracking inventory.</small><a class="btn btn-primary" href="{{ url_for('products.create') }}">Create Item</a></div></section>
+  {% endif %}
 </div>
 {% endblock %}

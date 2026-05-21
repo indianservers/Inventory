@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block content %}
+<form class="panel" method="post" style="max-width:760px" novalidate>
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <div class="d-flex justify-content-between align-items-center mb-3"><h2 class="h5 mb-0">{{ title }}</h2><a class="btn btn-outline-secondary" href="{{ url_for('settings.users') }}">Back</a></div>
+  <div class="form-grid">
+    <div><label class="form-label">Name</label><input class="form-control" name="name" value="{{ user.name or '' }}" required></div>
+    <div><label class="form-label">Email</label><input class="form-control" name="email" type="email" value="{{ user.email or '' }}" required></div>
+    <div><label class="form-label">Phone</label><input class="form-control" name="phone" type="tel" value="{{ user.phone or '' }}"></div>
+    <div><label class="form-label">Role</label><select class="form-select" name="role_id" required>{% for role in roles %}<option value="{{ role.id }}" {% if user.role_id == role.id %}selected{% endif %}>{{ role.name }}</option>{% endfor %}</select></div>
+    <div><label class="form-label">Password{% if user.id %} (leave blank to keep current){% endif %}</label><input class="form-control" name="password" type="password" {% if not user.id %}required{% endif %}></div>
+    <div class="full"><label class="form-check"><input class="form-check-input" type="checkbox" name="is_active" {% if user.is_active %}checked{% endif %}> Active</label></div>
+  </div>
+  <button class="btn btn-primary mt-3">Save User</button>
+</form>
+{% endblock %}

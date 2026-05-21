@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="row g-3">
+  <div class="col-lg-4">
+    <form class="panel" method="post" novalidate>
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <h2 class="h5">Add Serial Number</h2>
+      <label class="form-label">Product</label><select class="form-select mb-2" name="product_id" required>{% for product in products %}<option value="{{ product.id }}">{{ product.sku }} - {{ product.name }}</option>{% endfor %}</select>
+      <label class="form-label">Warehouse</label><select class="form-select mb-2" name="warehouse_id"><option value="">None</option>{% for warehouse in warehouses %}<option value="{{ warehouse.id }}">{{ warehouse.name }}</option>{% endfor %}</select>
+      <label class="form-label">Serial Number</label><input class="form-control mb-2" name="serial_no" required>
+      <label class="form-label">Status</label><select class="form-select mb-2" name="status">{% for status in statuses %}<option>{{ status }}</option>{% endfor %}</select>
+      <label class="form-label">Notes</label><textarea class="form-control mb-3" name="notes"></textarea>
+      <button class="btn btn-primary w-100">Save Serial</button>
+    </form>
+  </div>
+  <div class="col-lg-8">
+    <div class="panel">
+      <h2 class="h5">Serial Numbers</h2>
+      <table class="table datatable align-middle">
+        <thead><tr><th>Serial</th><th>Product</th><th>Warehouse</th><th>Status</th><th>Sale</th></tr></thead>
+        <tbody>{% for serial in serials %}<tr><td>{{ serial.serial_no }}</td><td>{{ serial.product.name }}</td><td>{{ serial.warehouse.name if serial.warehouse else '-' }}</td><td>{{ serial.status }}</td><td>{{ serial.sale_id or '-' }}</td></tr>{% endfor %}</tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

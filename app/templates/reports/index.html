@@ -1,1 +1,101 @@
-{% extends "base.html" %}{% block content %}<div class="row g-3">{% for name,url,icon in [('Sales Reports','reports.sales_report','receipt'),('Purchase Reports','reports.purchase_report','cart'),('Stock Reports','reports.stock_report','boxes'),('Low Stock','reports.low_stock_report','exclamation-triangle'),('Reorder Report','reports.reorder_report','arrow-repeat'),('Stock Valuation','reports.valuation_report','cash-stack'),('Expiry Alerts','reports.expiry_report','calendar-x'),('Inventory Ledger','reports.inventory_ledger','journal'),('Profit and Loss','reports.profit_loss','bar-chart'),('Receivable Aging','reports.receivables_aging','hourglass-split'),('Payable Aging','reports.payables_aging','calendar2-week'),('Trial Balance','reports.trial_balance','columns-gap'),('Balance Sheet','reports.balance_sheet','clipboard-data'),('Cash Flow','reports.cash_flow','water'),('Tax Summary','reports.tax_summary','percent'),('GSTR-1','reports.gstr1_report','file-earmark-ruled'),('ABC Analysis','reports.abc_analysis','diagram-3'),('Dead Stock','reports.dead_stock','archive'),('Stock Health','reports.stock_health_dashboard','activity'),('Sales Velocity','reports.sales_velocity','speedometer')] %}<div class="col-md-4"><a class="metric text-decoration-none d-block" href="{{ url_for(url) }}"><i class="bi bi-{{ icon }}"></i><div class="value h5 mt-2">{{ name }}</div><small>View, print, and export with DataTables.</small></a></div>{% endfor %}</div>{% endblock %}
+{% extends "base.html" %}
+{% set reports = [
+  ('Sales','Sales Summary','reports.sales_summary','Daily sales totals by customer, branch and register.','receipt'),
+  ('Sales','Item-wise Sales','reports.item_wise_sales','Product movement, revenue and quantity drill-down.','list-ul'),
+  ('Sales','Customer-wise Sales','reports.customer_wise_sales','Customer revenue and invoice behavior.','people'),
+  ('Sales','Sales Return Report','reports.sales_return_report','Returned items, reasons and restocking impact.','arrow-counterclockwise'),
+  ('Sales','Payment Received Report','reports.payments_received_report','Collections by date, branch and payment mode.','cash-coin'),
+  ('Receivables','Receivable Aging','reports.receivables_aging','Outstanding invoices by aging bucket.','hourglass-split'),
+  ('Purchases','Purchase Summary','reports.purchase_summary','Vendor bills and purchase totals.','cart'),
+  ('Purchases','Vendor-wise Purchase','reports.vendor_wise_purchase','Supplier-wise purchase performance.','truck'),
+  ('Purchases','Purchase Return Report','reports.purchase_return_report','Returned purchases and vendor credits.','arrow-return-left'),
+  ('Payables','Vendor Payment Report','reports.vendor_payment_report','Supplier payments by mode and period.','wallet2'),
+  ('Payables','Payable Aging','reports.payables_aging','Vendor outstanding by due bucket.','calendar2-week'),
+  ('Inventory','Stock Summary','reports.stock_summary','Current stock by warehouse, category and product.','boxes'),
+  ('Inventory','Stock Movement','reports.stock_movement_report','Ledger of every inventory movement.','journal'),
+  ('Inventory','Low Stock','reports.low_stock_report','Items below reorder or minimum levels.','exclamation-triangle'),
+  ('Inventory','Stock Valuation','reports.valuation_report','Inventory value by costing method.','cash-stack'),
+  ('Inventory','Batch Expiry Report','reports.expiry_report','Expiry risk by warehouse and product.','calendar-x'),
+  ('Inventory','Serial Number Report','reports.serial_number_report','Serial number lifecycle and status.','123'),
+  ('Tax','Tax Report','reports.tax_report','Tax collected and payable by rate.','percent'),
+  ('Tax','GSTR-1','reports.gstr1_report','GSTR-1 outward supply export.','file-earmark-ruled'),
+  ('Tax','GSTR-3B','reports.gstr3b_report','Monthly GST summary and ITC position.','file-earmark-spreadsheet'),
+  ('Tax','Tally Export','reports.tally_export','Tally XML voucher and master export.','filetype-xml'),
+  ('POS','Cashier Closing Report','reports.cashier_closing_report','Register session close and cash variance.','cash-stack'),
+  ('Accounting','Profit and Loss','reports.profit_loss','Revenue, expense and profit view.','bar-chart'),
+  ('Accounting','Trial Balance','reports.trial_balance','Ledger debit and credit balances.','columns-gap'),
+  ('Accounting','Balance Sheet','reports.balance_sheet','Assets, liabilities and equity.','clipboard-data'),
+  ('Accounting','Cash Flow','reports.cash_flow','Cash movement across activities.','water'),
+  ('Automation','Activity Log Report','reports.activity_log_report','Audit trail by user and action.','clock-history'),
+  ('Inventory','ABC Analysis','reports.abc_analysis','Pareto classification by product revenue.','diagram-3'),
+  ('Inventory','Dead Stock','reports.dead_stock','No-movement stock with value risk.','archive'),
+  ('Inventory','Stock Health','reports.stock_health_dashboard','Low, overstock, expiry and negative stock dashboard.','activity'),
+  ('Inventory','Sales Velocity','reports.sales_velocity','Sales speed and days of cover.','speedometer')
+] %}
+{% block content %}
+<div class="detail-hero">
+  <div>
+    <span class="eyebrow">Reports center</span>
+    <h2>Find, schedule and export every decision report</h2>
+    <p>Use favorites, categories and search to reach daily operating reports quickly. Each report opens with real database filters and export actions.</p>
+  </div>
+  <div class="hero-actions">
+    <a class="btn btn-outline-primary" href="{{ url_for('settings.scheduled_reports') }}"><i class="bi bi-calendar-event"></i> Scheduled Reports</a>
+    <a class="btn btn-primary" href="{{ url_for('integrations.custom_views') }}"><i class="bi bi-layout-text-window"></i> Save Views</a>
+  </div>
+</div>
+<div class="reports-shell">
+  <aside class="report-category-rail">
+    {% for category in ['Sales','Inventory','Purchases','Receivables','Payables','Accounting','Tax','POS','Restaurant','Automation','Custom Reports'] %}
+    <button type="button" class="{% if loop.first %}active{% endif %}" data-report-category="{{ category }}">{{ category }}</button>
+    {% endfor %}
+  </aside>
+  <section>
+    <div class="reports-toolbar">
+      <div class="input-group">
+        <span class="input-group-text"><i class="bi bi-search"></i></span>
+        <input class="form-control" id="reportSearch" placeholder="Search reports by name, module or purpose">
+      </div>
+      <button class="btn btn-outline-secondary"><i class="bi bi-star"></i> Favorites</button>
+      <button class="btn btn-outline-secondary"><i class="bi bi-clock-history"></i> Recent</button>
+      <a class="btn btn-outline-primary" href="{{ url_for('settings.scheduled_reports') }}"><i class="bi bi-send-check"></i> Schedule</a>
+    </div>
+    <div class="report-card-grid" id="reportGrid">
+      {% for category,name,url,description,icon in reports %}
+      <a class="report-card" href="{{ url_for(url) }}" data-category="{{ category }}" data-search="{{ (category ~ ' ' ~ name ~ ' ' ~ description)|lower }}">
+        <span class="report-card-head"><i class="bi bi-{{ icon }}"></i><span class="status-badge badge-muted">{{ category }}</span></span>
+        <strong>{{ name }}</strong>
+        <small>{{ description }}</small>
+        <span class="d-flex gap-2 flex-wrap">
+          <em class="status-badge badge-muted">Excel</em>
+          <em class="status-badge badge-muted">PDF/Print</em>
+          <em class="status-badge badge-muted">Schedule</em>
+        </span>
+      </a>
+      {% endfor %}
+    </div>
+  </section>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+const search = document.getElementById('reportSearch');
+const cards = [...document.querySelectorAll('.report-card')];
+const buttons = [...document.querySelectorAll('[data-report-category]')];
+function filterReports(category){
+  const q = (search.value || '').toLowerCase();
+  cards.forEach(card => {
+    const okCategory = !category || category === 'Sales' ? card.dataset.category === (category || 'Sales') : card.dataset.category === category || category === 'Custom Reports' || category === 'Restaurant';
+    const okSearch = !q || card.dataset.search.includes(q);
+    card.hidden = !(okCategory && okSearch);
+  });
+}
+buttons.forEach(btn => btn.addEventListener('click', () => {
+  buttons.forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  filterReports(btn.dataset.reportCategory);
+}));
+search.addEventListener('input', () => filterReports(document.querySelector('[data-report-category].active').dataset.reportCategory));
+filterReports('Sales');
+</script>
+{% endblock %}

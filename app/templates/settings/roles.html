@@ -1,1 +1,37 @@
-{% extends "base.html" %}{% block content %}<div class="panel"><table class="table datatable"><thead><tr><th>Role</th><th>Description</th><th>Permissions</th><th></th></tr></thead><tbody>{% for r in roles %}<tr><td>{{ r.name }}</td><td>{{ r.description }}</td><td>{{ r.permissions.count() }}</td><td class="text-end"><a class="btn btn-sm btn-outline-primary" href="{{ url_for('settings.role_permissions', id=r.id) }}"><i class="bi bi-shield-check"></i> Permissions</a></td></tr>{% endfor %}</tbody></table></div>{% endblock %}
+{% extends "base.html" %}
+{% block content %}
+<div class="row g-3">
+  <div class="col-lg-4">
+    <form class="panel" method="post" novalidate>
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <h2 class="h5">Create Role</h2>
+      <label class="form-label">Role Name</label><input class="form-control mb-2" name="name" required>
+      <label class="form-label">Description</label><textarea class="form-control mb-3" name="description" rows="3"></textarea>
+      <button class="btn btn-primary w-100">Create Role</button>
+    </form>
+  </div>
+  <div class="col-lg-8">
+    <div class="panel">
+      <h2 class="h5">Roles & Permissions</h2>
+      <table class="table datatable align-middle">
+        <thead><tr><th>Role</th><th>Description</th><th>Permissions</th><th></th></tr></thead>
+        <tbody>{% for r in roles %}
+        <tr>
+          <td>{{ r.name }}</td>
+          <td>
+            <form class="d-flex gap-2" method="post" action="{{ url_for('settings.role_edit', id=r.id) }}">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <input type="hidden" name="name" value="{{ r.name }}">
+              <input class="form-control form-control-sm" name="description" value="{{ r.description or '' }}">
+              <button class="btn btn-sm btn-outline-secondary">Save</button>
+            </form>
+          </td>
+          <td>{{ r.permissions.filter_by(granted=True).count() }}</td>
+          <td class="text-end"><a class="btn btn-sm btn-outline-primary" href="{{ url_for('settings.role_permissions', id=r.id) }}"><i class="bi bi-shield-check"></i> Matrix</a></td>
+        </tr>
+        {% endfor %}</tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

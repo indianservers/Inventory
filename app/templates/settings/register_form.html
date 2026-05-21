@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block content %}
+<form class="panel" method="post" style="max-width:760px" novalidate>
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <div class="d-flex justify-content-between align-items-center mb-3"><h2 class="h5 mb-0">Edit POS Register</h2><a class="btn btn-outline-secondary" href="{{ url_for('settings.registers') }}">Back</a></div>
+  <div class="form-grid">
+    <div><label class="form-label">Register Name</label><input class="form-control" name="name" value="{{ register.name }}" required></div>
+    <div><label class="form-label">Register Code</label><input class="form-control" name="code" value="{{ register.code }}" required maxlength="20"></div>
+    <div><label class="form-label">Branch</label><select class="form-select" name="branch_id" required>{% for branch in branches %}<option value="{{ branch.id }}" {% if register.branch_id == branch.id %}selected{% endif %}>{{ branch.name }}</option>{% endfor %}</select></div>
+    <div><label class="form-label">Warehouse</label><select class="form-select" name="warehouse_id" required>{% for warehouse in warehouses %}<option value="{{ warehouse.id }}" {% if register.warehouse_id == warehouse.id %}selected{% endif %}>{{ warehouse.name }}</option>{% endfor %}</select></div>
+    <div class="full"><label class="form-label">Default Receipt Printer</label><input class="form-control" name="receipt_printer" value="{{ register.receipt_printer or '' }}"></div>
+    <div class="full"><label class="form-check"><input class="form-check-input" type="checkbox" name="status" {% if register.status %}checked{% endif %}> Active</label></div>
+  </div>
+  <button class="btn btn-primary mt-3">Save Register</button>
+</form>
+{% endblock %}

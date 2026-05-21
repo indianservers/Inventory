@@ -1,1 +1,52 @@
-{% extends "base.html" %}{% block content %}<form class="panel" method="post" enctype="multipart/form-data"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><div class="form-grid">{% if setting.logo %}<div class="full"><img src="{{ url_for('static', filename=setting.logo) }}" alt="Company logo" style="max-height:80px"></div>{% endif %}<div class="full"><label class="form-label">Company Logo</label><input class="form-control" type="file" name="logo" accept="image/*"></div>{% for f in ['company_name','business_type','address','city','state','country','postal_code','phone','email','website','tax_number','pan_number','currency','invoice_prefix','purchase_prefix','quotation_prefix','receipt_prefix','payment_prefix','tax_mode'] %}<div><label class="form-label">{{ f|replace('_',' ')|title }}</label><input class="form-control" name="{{ f }}" value="{{ setting|attr(f) or '' }}"></div>{% endfor %}<div class="full"><label class="form-label">Default Invoice Terms</label><textarea class="form-control" name="default_invoice_terms">{{ setting.default_invoice_terms or '' }}</textarea></div><div class="full d-flex gap-3">{% for f in ['enable_negative_stock','enable_batch_tracking','enable_expiry_tracking','enable_barcode'] %}<label class="form-check"><input class="form-check-input" type="checkbox" name="{{ f }}" {% if setting|attr(f) %}checked{% endif %}> {{ f|replace('_',' ')|title }}</label>{% endfor %}</div></div><button class="btn btn-primary mt-3">Save</button></form>{% endblock %}
+{% extends "base.html" %}
+{% block content %}
+<form class="panel" method="post" enctype="multipart/form-data" novalidate>
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h2 class="h5 mb-0">Company Profile</h2>
+    <button class="btn btn-primary">Save Profile</button>
+  </div>
+  {% if setting.logo %}
+  <div class="mb-3">
+    <img src="{{ url_for('static', filename=setting.logo) }}" alt="Company logo" style="max-height:80px">
+  </div>
+  {% endif %}
+  <div class="form-grid">
+    <div>
+      <label class="form-label">Legal Name</label>
+      <input class="form-control" name="legal_name" value="{{ setting.legal_name or '' }}" required maxlength="200">
+    </div>
+    <div>
+      <label class="form-label">Trade Name</label>
+      <input class="form-control" name="trade_name" value="{{ setting.trade_name or '' }}" maxlength="200">
+    </div>
+    <div class="full">
+      <label class="form-label">Logo</label>
+      <input class="form-control" type="file" name="logo" accept="image/png,image/jpeg,image/webp">
+    </div>
+    <div class="full">
+      <label class="form-label">Address</label>
+      <textarea class="form-control" name="address" rows="2">{{ setting.address or '' }}</textarea>
+    </div>
+    {% for field,label,type in [
+      ('city','City','text'),('state','State','text'),('country','Country','text'),('postal_code','Postal Code','text'),
+      ('phone','Phone','tel'),('email','Email','email'),('website','Website','url'),('tax_number','GSTIN / VAT TRN','text'),
+      ('currency','Currency','text'),('invoice_prefix','Invoice Prefix','text'),('purchase_prefix','Purchase Prefix','text'),
+      ('quotation_prefix','Quotation Prefix','text'),('receipt_prefix','Receipt Prefix','text'),('payment_prefix','Payment Prefix','text')
+    ] %}
+    <div>
+      <label class="form-label">{{ label }}</label>
+      <input class="form-control" type="{{ type }}" name="{{ field }}" value="{{ setting|attr(field) or '' }}" {% if field in ['currency','invoice_prefix'] %}required{% endif %}>
+    </div>
+    {% endfor %}
+    <div>
+      <label class="form-label">Financial Year Start Month</label>
+      <select class="form-select" name="financial_year_start_month" required>
+        {% for month_no, month_name in [(1,'January'),(2,'February'),(3,'March'),(4,'April'),(5,'May'),(6,'June'),(7,'July'),(8,'August'),(9,'September'),(10,'October'),(11,'November'),(12,'December')] %}
+        <option value="{{ month_no }}" {% if setting.financial_year_start_month == month_no %}selected{% endif %}>{{ month_name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+  </div>
+</form>
+{% endblock %}

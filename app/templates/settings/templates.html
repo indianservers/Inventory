@@ -4,7 +4,8 @@
 <div class="row g-3">{% for template in templates %}
   <div class="col-md-4"><div class="panel h-100">
     <div class="d-flex justify-content-between"><h2 class="h6">{{ template.name }}</h2>{% if template.is_default %}<span class="badge text-bg-success">Default</span>{% endif %}</div>
-    <p class="text-muted">{{ template.template_type }}</p>
+    <p class="text-muted mb-1">{{ template.template_type }}</p>
+    <div class="small text-muted mb-2">{{ template.paper_size or 'A4' }} · {{ template.module or template.template_type }}</div>
     <div class="border rounded bg-light mb-3" style="height:120px;overflow:hidden">{{ template.html|safe }}</div>
     <a class="btn btn-sm btn-outline-primary" href="{{ url_for('settings.template_edit', id=template.id) }}">Edit</a>
     <a class="btn btn-sm btn-outline-secondary" target="_blank" href="{{ url_for('settings.template_preview', id=template.id) }}">Preview</a>

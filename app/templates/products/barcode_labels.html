@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="panel mb-3">
+  <form class="row g-2 align-items-end">
+    <div class="col-md-10">
+      <label class="form-label">Products</label>
+      <select class="form-select" name="id" multiple size="5">
+        {% for product in products %}
+        <option value="{{ product.id }}" {% if product in labels|map(attribute='product')|list %}selected{% endif %}>{{ product.sku }} - {{ product.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-md-2"><button class="btn btn-primary w-100">Generate</button></div>
+  </form>
+</div>
+<div class="panel">
+  <div class="d-flex justify-content-between mb-3">
+    <h2 class="h5 mb-0">Barcode Labels</h2>
+    <button class="btn btn-outline-primary" onclick="window.print()"><i class="bi bi-printer"></i> Print</button>
+  </div>
+  <div class="row g-3 barcode-sheet">
+    {% for label in labels %}
+    <div class="col-6 col-md-3">
+      <div class="border rounded p-2 text-center h-100">
+        <img src="data:image/png;base64,{{ label.qr_data }}" alt="{{ label.barcode }}" style="width:90px;height:90px">
+        <div class="fw-semibold small">{{ label.product.name }}</div>
+        <div class="small">{{ label.product.sku }}</div>
+        <div class="small">{{ label.barcode }}</div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}

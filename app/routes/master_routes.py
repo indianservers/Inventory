@@ -2,7 +2,7 @@ from flask import Blueprint, flash, redirect, render_template, request, url_for
 from flask_login import login_required
 
 from app.extensions import db
-from app.models import Brand, Category, Tax, Unit, Warehouse
+from app.models import Brand, Category, Tax, TaxGroup, TaxRate, Unit, Warehouse
 
 bp = Blueprint("masters", __name__, url_prefix="/masters")
 
@@ -98,17 +98,17 @@ def delete_unit(id):
 @bp.route("/warehouses", methods=["GET", "POST"])
 @login_required
 def warehouses():
-    if request.method == "POST":
-        obj = Warehouse(); save_warehouse(obj); db.session.add(obj); db.session.commit(); flash("Warehouse saved.", "success")
-        return redirect(url_for("masters.warehouses"))
-    return render_template("masters/warehouses.html", title="Warehouses", items=Warehouse.query.all())
+    return redirect(url_for("settings.warehouses"))
 
 
 @bp.route("/warehouses/<int:id>/delete")
 @login_required
 def delete_warehouse(id):
-    Warehouse.query.filter_by(id=id).delete(); db.session.commit(); flash("Warehouse deleted.", "success")
-    return redirect(url_for("masters.warehouses"))
+    warehouse = Warehouse.query.get_or_404(id)
+    warehouse.status = False
+    db.session.commit()
+    flash("Warehouse deactivated.", "success")
+    return redirect(url_for("settings.warehouses"))
 
 
 @bp.route("/taxes", methods=["GET", "POST"])
@@ -117,5 +117,24 @@ def taxes():
     if request.method == "POST":
         obj = Tax(); save_tax(obj); db.session.add(obj); db.session.commit(); flash("Tax saved.", "success")
         return redirect(url_for("masters.taxes"))
-    return render_template("masters/taxes.html", title="Tax Settings", items=Tax.query.all())
+    return render_template("masters/taxes.html", title="Tax Settings", items=Tax.query.all(), groups=TaxGroup.query.order_by(TaxGroup.name).all(), rates=TaxRate.query.order_by(TaxRate.name).all())
 
+
+@bp.route("/tax-groups", methods=["POST"])
+@login_required
+def tax_groups():
+    group = TaxGroup(name=request.form["name"], description=request.form.get("description"), status=bool(request.form.get("status")))
+    db.session.add(group)
+    db.session.commit()
+    flash("Tax group saved.", "success")
+    return redirect(url_for("masters.taxes"))
+
+
+@bp.route("/tax-rates", methods=["POST"])
+@login_required
+def tax_rates():
+    rate = TaxRate(tax_group_id=request.form.get("tax_group_id") or None, name=request.form["name"], rate=request.form.get("rate") or 0, tax_type=request.form.get("tax_type") or "GST", treatment=request.form.get("treatment") or "Taxable", status=bool(request.form.get("status")))
+    db.session.add(rate)
+    db.session.commit()
+    flash("Tax rate saved.", "success")
+    return redirect(url_for("masters.taxes"))

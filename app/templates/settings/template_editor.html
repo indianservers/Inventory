@@ -7,6 +7,17 @@
     <div class="col-md-4"><select class="form-select" name="template_type">{% for t in template_types %}<option value="{{ t }}" {% if template.template_type == t %}selected{% endif %}>{{ t.replace('_',' ')|title }}</option>{% endfor %}</select></div>
     <div class="col-md-3"><label class="form-check mt-2"><input class="form-check-input" type="checkbox" name="is_default" {% if template.is_default %}checked{% endif %}> Default</label></div>
   </div>
+  <div class="row g-3 mb-3">
+    <div class="col-md-3"><label class="form-label">Module</label><input class="form-control" name="module" value="{{ template.module or template.template_type }}"></div>
+    <div class="col-md-3"><label class="form-label">Paper Size</label><select class="form-select" name="paper_size">{% for p in ["A4","A5","thermal_80mm","thermal_58mm"] %}<option value="{{ p }}" {% if template.paper_size == p %}selected{% endif %}>{{ p|replace("_"," ")|title }}</option>{% endfor %}</select></div>
+    <div class="col-md-6 d-flex align-items-end gap-3">
+      <label class="form-check"><input class="form-check-input" type="checkbox" name="show_header" {% if template.show_header is not sameas false %}checked{% endif %}> Header</label>
+      <label class="form-check"><input class="form-check-input" type="checkbox" name="show_footer" {% if template.show_footer is not sameas false %}checked{% endif %}> Footer</label>
+      <label class="form-check"><input class="form-check-input" type="checkbox" name="show_logo" {% if template.show_logo is not sameas false %}checked{% endif %}> Logo</label>
+    </div>
+    <div class="col-md-6"><label class="form-label">Column Configuration JSON</label><textarea class="form-control font-monospace" name="column_config" rows="2">{{ template.column_config or '{"columns":["item","qty","rate","tax","total"]}' }}</textarea></div>
+    <div class="col-md-6"><label class="form-label">Terms and Conditions</label><textarea class="form-control" name="terms_conditions" rows="2">{{ template.terms_conditions or '' }}</textarea></div>
+  </div>
   <div class="row g-3">
     <div class="col-lg-5">
       <textarea id="template-html" name="html">{{ template.html or '' }}</textarea>

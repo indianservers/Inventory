@@ -1,0 +1,147 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="row g-3">
+  <div class="col-lg-4">
+    <div class="panel">
+      <h2 class="h5 mb-3">Add {{ title }}</h2>
+      <form method="post">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        {% if kind == "email_templates" %}
+          <label class="form-label">Name</label><input class="form-control mb-2" name="name" required>
+          <label class="form-label">Template Type</label>
+          <select class="form-select mb-2" name="template_type">
+            {% for value in ["invoice_email","payment_receipt_email","sales_order_email","purchase_order_email","payment_reminder","low_stock_alert","delivery_update"] %}<option value="{{ value }}">{{ value|replace("_"," ")|title }}</option>{% endfor %}
+          </select>
+          <label class="form-label">Subject</label><input class="form-control mb-2" name="subject" required>
+          <label class="form-label">Body</label><textarea class="form-control mb-2" name="body" rows="6" required></textarea>
+          <label class="form-label">Available Placeholders</label><textarea class="form-control mb-2" name="placeholders" rows="2">{{ "{{ invoice.invoice_no }}, {{ customer.name }}, {{ invoice.grand_total }}" }}</textarea>
+          <div class="form-check mb-3"><input class="form-check-input" type="checkbox" name="is_active" checked><label class="form-check-label">Active</label></div>
+        {% elif kind == "communication_settings" %}
+          <label class="form-label">Channel</label>
+          <select class="form-select mb-2" name="provider_type"><option value="email">Email</option><option value="whatsapp">WhatsApp</option><option value="sms">SMS</option></select>
+          <label class="form-label">Provider Name</label><input class="form-control mb-2" name="provider_name" placeholder="SMTP, Meta, Twilio">
+          <label class="form-label">Configuration JSON</label><textarea class="form-control mb-2 font-monospace" name="config_json" rows="5" placeholder='{"token":"..."}'></textarea>
+          <div class="form-check"><input class="form-check-input" type="checkbox" name="test_mode" checked><label class="form-check-label">Test mode</label></div>
+          <div class="form-check mb-3"><input class="form-check-input" type="checkbox" name="is_active" checked><label class="form-check-label">Active</label></div>
+        {% elif kind == "payment_gateways" %}
+          <label class="form-label">Provider</label><input class="form-control mb-2" name="provider" placeholder="razorpay, stripe, manual">
+          <label class="form-label">Display Name</label><input class="form-control mb-2" name="display_name" required>
+          <label class="form-label">API Key Label</label><input class="form-control mb-2" name="api_key_label">
+          <label class="form-label">Configuration JSON</label><textarea class="form-control mb-2 font-monospace" name="config_json" rows="5"></textarea>
+          <div class="form-check"><input class="form-check-input" type="checkbox" name="test_mode" checked><label class="form-check-label">Test mode</label></div>
+          <div class="form-check mb-3"><input class="form-check-input" type="checkbox" name="is_active" checked><label class="form-check-label">Active</label></div>
+        {% elif kind == "ecommerce_integrations" %}
+          <label class="form-label">Platform</label><input class="form-control mb-2" name="provider_name" placeholder="Shopify, WooCommerce, Amazon">
+          <label class="form-label">Configuration JSON</label><textarea class="form-control mb-2 font-monospace" name="config_json" rows="5"></textarea>
+          <div class="form-check"><input class="form-check-input" type="checkbox" name="test_mode" checked><label class="form-check-label">Test mode</label></div>
+          <div class="form-check mb-3"><input class="form-check-input" type="checkbox" name="is_active" checked><label class="form-check-label">Active</label></div>
+        {% elif kind == "shipping_providers" %}
+          <label class="form-label">Provider Name</label><input class="form-control mb-2" name="name" required>
+          <label class="form-label">Provider Code</label><input class="form-control mb-2" name="provider_code" required>
+          <label class="form-label">Configuration JSON</label><textarea class="form-control mb-2 font-monospace" name="config_json" rows="5"></textarea>
+          <div class="form-check"><input class="form-check-input" type="checkbox" name="test_mode" checked><label class="form-check-label">Test mode</label></div>
+          <div class="form-check mb-3"><input class="form-check-input" type="checkbox" name="is_active" checked><label class="form-check-label">Active</label></div>
+        {% elif kind == "webhooks" %}
+          <label class="form-label">Name</label><input class="form-control mb-2" name="name" required>
+          <label class="form-label">Target URL</label><input class="form-control mb-2" name="target_url" type="url" required>
+          <label class="form-label">Events</label><textarea class="form-control mb-2" name="events" rows="3">invoice.created,payment.received,stock.low</textarea>
+          <label class="form-label">Secret</label><input class="form-control mb-2" name="secret">
+          <div class="form-check mb-3"><input class="form-check-input" type="checkbox" name="is_active" checked><label class="form-check-label">Active</label></div>
+        {% elif kind == "custom_fields" %}
+          <label class="form-label">Entity</label><select class="form-select mb-2" name="entity_type">{% for value in ["products","customers","vendors","invoices","sales_orders","purchase_orders"] %}<option>{{ value }}</option>{% endfor %}</select>
+          <label class="form-label">Field Key</label><input class="form-control mb-2" name="field_key" required>
+          <label class="form-label">Label</label><input class="form-control mb-2" name="label" required>
+          <label class="form-label">Field Type</label><select class="form-select mb-2" name="field_type">{% for value in ["Text","Number","Date","Dropdown","Checkbox","Textarea"] %}<option>{{ value }}</option>{% endfor %}</select>
+          <label class="form-label">Dropdown Options</label><textarea class="form-control mb-2" name="options" rows="2"></textarea>
+          <div class="form-check"><input class="form-check-input" type="checkbox" name="is_required"><label class="form-check-label">Required</label></div>
+          <div class="form-check mb-3"><input class="form-check-input" type="checkbox" name="is_active" checked><label class="form-check-label">Active</label></div>
+        {% elif kind == "custom_views" %}
+          <label class="form-label">Entity</label><select class="form-select mb-2" name="entity_type">{% for value in ["products","customers","invoices","sales_orders","purchase_orders","reports"] %}<option>{{ value }}</option>{% endfor %}</select>
+          <label class="form-label">Name</label><input class="form-control mb-2" name="name" required>
+          <label class="form-label">Filters JSON</label><textarea class="form-control mb-2 font-monospace" name="filters_json" rows="3">{}</textarea>
+          <label class="form-label">Columns JSON</label><textarea class="form-control mb-2 font-monospace" name="columns_json" rows="3">[]</textarea>
+          <label class="form-label">Sort JSON</label><textarea class="form-control mb-2 font-monospace" name="sort_json" rows="2">{}</textarea>
+          <div class="form-check mb-3"><input class="form-check-input" type="checkbox" name="is_default"><label class="form-check-label">Default view</label></div>
+        {% elif kind == "workflows" %}
+          <label class="form-label">Name</label><input class="form-control mb-2" name="name" required>
+          <label class="form-label">Trigger</label><select class="form-select mb-2" name="trigger_event">{% for value in ["stock.low","invoice.overdue","invoice.paid","purchase_bill.approved","customer.credit_limit_exceeded"] %}<option>{{ value }}</option>{% endfor %}</select>
+          <label class="form-label">Condition Field</label><input class="form-control mb-2" name="condition_field" placeholder="product.current_stock">
+          <label class="form-label">Operator</label><select class="form-select mb-2" name="condition_operator"><option value="equals">equals</option><option value="not_equals">not equals</option><option value="lt">less than</option><option value="gt">greater than</option><option value="contains">contains</option></select>
+          <label class="form-label">Condition Value</label><input class="form-control mb-2" name="condition_value">
+          <label class="form-label">Action</label><select class="form-select mb-2" name="action_type"><option value="send_notification">Send notification</option><option value="block_credit_sale">Block credit sale</option><option value="mark_order_completed">Mark order completed</option></select>
+          <label class="form-label">Action Config JSON</label><textarea class="form-control mb-2 font-monospace" name="action_config" rows="3">{}</textarea>
+          <div class="form-check mb-3"><input class="form-check-input" type="checkbox" name="is_active" checked><label class="form-check-label">Active</label></div>
+        {% elif kind == "scheduled_jobs" %}
+          <label class="form-label">Name</label><input class="form-control mb-2" name="name" required>
+          <label class="form-label">Job Type</label><select class="form-select mb-2" name="job_type">{% for value in ["low_stock_alert","daily_sales_summary","weekly_receivables_report","monthly_tax_summary","batch_expiry_alert"] %}<option>{{ value }}</option>{% endfor %}</select>
+          <label class="form-label">Frequency</label><select class="form-select mb-2" name="frequency"><option>Daily</option><option>Weekly</option><option>Monthly</option></select>
+          <label class="form-label">Time</label><input class="form-control mb-2" name="time_of_day" type="time" value="09:00">
+          <label class="form-label">Config JSON</label><textarea class="form-control mb-2 font-monospace" name="config_json" rows="3">{}</textarea>
+          <div class="form-check mb-3"><input class="form-check-input" type="checkbox" name="is_active" checked><label class="form-check-label">Active</label></div>
+        {% elif kind == "loyalty" %}
+          <div class="form-check mb-3"><input class="form-check-input" type="checkbox" name="is_enabled" {% if setting and setting.is_enabled %}checked{% endif %}><label class="form-check-label">Enable loyalty</label></div>
+          <label class="form-label">Earn For Amount</label><input class="form-control mb-2" name="earn_points_per_amount" value="{{ setting.earn_points_per_amount or 100 }}">
+          <label class="form-label">Points Earned</label><input class="form-control mb-2" name="points_earned" value="{{ setting.points_earned or 1 }}">
+          <label class="form-label">Redemption Value Per Point</label><input class="form-control mb-2" name="redemption_value_per_point" value="{{ setting.redemption_value_per_point or 1 }}">
+          <label class="form-label">Expiry Days</label><input class="form-control mb-2" name="points_expiry_days" value="{{ setting.points_expiry_days or 365 }}">
+        {% elif kind == "coupons" %}
+          <label class="form-label">Coupon Code</label><input class="form-control mb-2" name="code" required>
+          <label class="form-label">Description</label><input class="form-control mb-2" name="description">
+          <label class="form-label">Discount Type</label><select class="form-select mb-2" name="discount_type"><option>Percentage</option><option>Fixed</option></select>
+          <label class="form-label">Discount Value</label><input class="form-control mb-2" name="discount_value" type="number" step="0.01" required>
+          <div class="row g-2"><div class="col-6"><label class="form-label">Valid From</label><input class="form-control mb-2" name="valid_from" type="date"></div><div class="col-6"><label class="form-label">Valid To</label><input class="form-control mb-2" name="valid_to" type="date"></div></div>
+          <label class="form-label">Minimum Invoice Amount</label><input class="form-control mb-2" name="minimum_invoice_amount" type="number" step="0.01" value="0">
+          <div class="row g-2"><div class="col-6"><label class="form-label">Max Usage</label><input class="form-control mb-2" name="max_usage" type="number"></div><div class="col-6"><label class="form-label">Per Customer</label><input class="form-control mb-2" name="per_customer_usage_limit" type="number"></div></div>
+          <div class="form-check mb-3"><input class="form-check-input" type="checkbox" name="is_active" checked><label class="form-check-label">Active</label></div>
+        {% endif %}
+        <button class="btn btn-primary w-100">Save</button>
+      </form>
+      {% if kind == "scheduled_jobs" %}
+      <form method="post" action="{{ url_for('integrations.run_due_jobs') }}" class="mt-2"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn btn-outline-success w-100">Run Due Jobs</button></form>
+      {% endif %}
+      {% if kind == "communication_settings" %}
+      <form method="post" action="{{ url_for('integrations.test_email') }}" class="mt-2">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input class="form-control mb-2" type="email" name="recipient" placeholder="test@example.com">
+        <button class="btn btn-outline-success w-100">Send Test Email</button>
+      </form>
+      {% endif %}
+    </div>
+  </div>
+  <div class="col-lg-8">
+    <div class="panel">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2 class="h5 mb-0">{{ title }}</h2>
+        <span class="badge text-bg-light">{{ rows|length }} record(s)</span>
+      </div>
+      {% if rows %}
+      <div class="table-responsive">
+        <table class="table table-sm align-middle datatable">
+          <thead><tr>
+            <th>ID</th><th>Name</th><th>Type</th><th>Status</th><th>Details</th><th></th>
+          </tr></thead>
+          <tbody>
+          {% for row in rows %}
+            <tr>
+              <td>{{ row.id }}</td>
+              <td>{{ row.name or row.display_name or row.provider_name or row.provider or row.label }}</td>
+              <td>{{ row.template_type or row.provider_type or row.provider or row.entity_type or row.trigger_event or row.job_type or row.provider_code or row.discount_type }}</td>
+              <td>
+                {% set active = row.is_active if row.is_active is defined else true %}
+                <span class="badge {{ 'text-bg-success' if active else 'text-bg-secondary' }}">{{ 'Active' if active else 'Inactive' }}</span>
+                {% if row.test_mode is defined and row.test_mode %}<span class="badge text-bg-warning">Test</span>{% endif %}
+              </td>
+              <td class="small text-muted">{{ row.subject or row.target_url or row.events or row.field_key or row.time_of_day or row.created_at }}</td>
+              <td>{% if kind == "webhooks" %}<form method="post" action="{{ url_for('integrations.webhook_test', id=row.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn btn-sm btn-outline-primary">Test</button></form>{% endif %}</td>
+            </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+        <div class="text-muted text-center py-5">No records yet.</div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}

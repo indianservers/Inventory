@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="row g-3">
+  <div class="col-lg-4">
+    <form class="panel" method="post" novalidate>
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <h2 class="h5">Add POS Register</h2>
+      <label class="form-label">Register Name</label><input class="form-control mb-2" name="name" required>
+      <label class="form-label">Register Code</label><input class="form-control mb-2" name="code" required maxlength="20">
+      <label class="form-label">Branch</label><select class="form-select mb-2" name="branch_id" required>{% for branch in branches %}<option value="{{ branch.id }}">{{ branch.name }}</option>{% endfor %}</select>
+      <label class="form-label">Warehouse</label><select class="form-select mb-2" name="warehouse_id" required>{% for warehouse in warehouses %}<option value="{{ warehouse.id }}">{{ warehouse.name }}</option>{% endfor %}</select>
+      <label class="form-label">Default Receipt Printer</label><input class="form-control mb-2" name="receipt_printer" placeholder="Printer name or future integration key">
+      <label class="form-check mb-3"><input class="form-check-input" type="checkbox" name="status" checked> Active</label>
+      <button class="btn btn-primary w-100">Save Register</button>
+    </form>
+  </div>
+  <div class="col-lg-8">
+    <div class="panel">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2 class="h5 mb-0">POS Registers</h2>
+        <form><select class="form-select form-select-sm" name="status" onchange="this.form.submit()">{% for key,label in [('all','All'),('active','Active'),('inactive','Inactive')] %}<option value="{{ key }}" {% if status == key %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></form>
+      </div>
+      <table class="table datatable align-middle">
+        <thead><tr><th>Code</th><th>Name</th><th>Branch</th><th>Warehouse</th><th>Status</th><th></th></tr></thead>
+        <tbody>{% for register in registers %}
+        <tr>
+          <td>{{ register.code }}</td><td>{{ register.name }}</td><td>{{ register.branch.name }}</td><td>{{ register.warehouse.name }}</td>
+          <td><span class="badge {{ 'text-bg-success' if register.status else 'text-bg-secondary' }}">{{ 'Active' if register.status else 'Inactive' }}</span></td>
+          <td class="text-end"><a class="btn btn-sm btn-outline-primary" href="{{ url_for('settings.register_edit', id=register.id) }}">Edit</a> <form class="d-inline" method="post" action="{{ url_for('settings.register_toggle', id=register.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn btn-sm btn-outline-secondary">{{ 'Deactivate' if register.status else 'Reactivate' }}</button></form></td>
+        </tr>
+        {% endfor %}</tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="panel">
+  <h2 class="h5 mb-3">{{ title }}</h2>
+  {% if rows %}
+  <div class="table-responsive">
+    <table class="table table-sm align-middle datatable">
+      <thead>
+        <tr>
+          <th>ID</th><th>Type</th><th>Status</th><th>Reference</th><th>Message</th><th>Date</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for row in rows %}
+        {% set log_type = row.channel or row.event or (row.job.job_type if row.job is defined and row.job else row.job_type|default('')) %}
+        {% set ref_text = row.reference_type or (row.subscription.name if row.subscription is defined and row.subscription else '') or row.recipient or (row.job.name if row.job is defined and row.job else '') %}
+        <tr>
+          <td>{{ row.id }}</td>
+          <td>{{ log_type }}</td>
+          <td><span class="badge text-bg-{{ 'success' if row.status in ['Sent','Mock Sent','Delivered','Success'] else 'warning' if row.status in ['Pending','Running','Provider configuration required'] else 'danger' }}">{{ row.status }}</span></td>
+          <td>{{ ref_text }}</td>
+          <td class="small text-muted">{{ row.subject or row.message or row.error_message or row.response_body }}</td>
+          <td>{{ row.created_at or row.started_at }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="text-muted text-center py-5">No log records found.</div>
+  {% endif %}
+</div>
+
+{% if incoming %}
+<div class="panel mt-3">
+  <h2 class="h5 mb-3">Incoming Webhooks</h2>
+  <div class="table-responsive">
+    <table class="table table-sm datatable">
+      <thead><tr><th>ID</th><th>Provider</th><th>Event</th><th>Status</th><th>Date</th></tr></thead>
+      <tbody>
+      {% for row in incoming %}
+        <tr><td>{{ row.id }}</td><td>{{ row.provider }}</td><td>{{ row.event_type }}</td><td>{{ row.status }}</td><td>{{ row.created_at }}</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+{% endblock %}

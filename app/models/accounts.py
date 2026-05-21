@@ -160,12 +160,59 @@ class PaymentReceived(db.Model):
     reference_no = db.Column(db.String(50))
     notes = db.Column(db.Text)
     sale_id = db.Column(db.Integer, db.ForeignKey('sales.id'), nullable=True)
+    unallocated_amount = db.Column(db.Numeric(12, 2), default=0)
+    status = db.Column(db.String(20), default='Posted')
+    reversed_at = db.Column(db.DateTime)
+    reversal_reason = db.Column(db.Text)
     created_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     sale = db.relationship('Sale', backref='payments')
 
     def __repr__(self):
         return f'<PaymentReceived {self.receipt_no}>'
+
+
+class PaymentAllocation(db.Model):
+    __tablename__ = 'payment_allocations'
+    id = db.Column(db.Integer, primary_key=True)
+    payment_id = db.Column(db.Integer, db.ForeignKey('payments_received.id', ondelete='CASCADE'), nullable=False)
+    sale_id = db.Column(db.Integer, db.ForeignKey('sales.id'), nullable=False)
+    amount = db.Column(db.Numeric(12, 2), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    payment = db.relationship('PaymentReceived', backref='allocations')
+    sale = db.relationship('Sale', backref='payment_allocations')
+
+
+class Refund(db.Model):
+    __tablename__ = 'refunds'
+    id = db.Column(db.Integer, primary_key=True)
+    refund_no = db.Column(db.String(30), unique=True, nullable=False)
+    refund_date = db.Column(db.Date, nullable=False)
+    customer_id = db.Column(db.Integer, db.ForeignKey('customers.id'), nullable=False)
+    credit_note_id = db.Column(db.Integer, db.ForeignKey('credit_notes.id'), nullable=True)
+    sale_return_id = db.Column(db.Integer, db.ForeignKey('sales_returns.id'), nullable=True)
+    amount = db.Column(db.Numeric(12, 2), nullable=False)
+    refund_mode = db.Column(db.String(30), default='Cash')
+    reference_no = db.Column(db.String(50))
+    approval_status = db.Column(db.String(20), default='Approved')
+    notes = db.Column(db.Text)
+    created_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    customer = db.relationship('Customer', backref='refunds')
+    credit_note = db.relationship('CreditNote', backref='refunds')
+    sale_return = db.relationship('SalesReturn', backref='refunds')
+
+
+class CashMovement(db.Model):
+    __tablename__ = 'cash_movements'
+    id = db.Column(db.Integer, primary_key=True)
+    session_id = db.Column(db.Integer, db.ForeignKey('pos_sessions.id'), nullable=False)
+    movement_date = db.Column(db.DateTime, default=datetime.utcnow)
+    movement_type = db.Column(db.String(20), nullable=False)
+    amount = db.Column(db.Numeric(12, 2), nullable=False)
+    reason = db.Column(db.String(255))
+    created_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+    session = db.relationship('POSSession', backref='cash_movements')
 
 
 class PaymentMade(db.Model):
@@ -182,12 +229,27 @@ class PaymentMade(db.Model):
     reference_no = db.Column(db.String(50))
     notes = db.Column(db.Text)
     purchase_id = db.Column(db.Integer, db.ForeignKey('purchases.id'), nullable=True)
+    unallocated_amount = db.Column(db.Numeric(12, 2), default=0)
+    status = db.Column(db.String(20), default='Posted')
+    reversed_at = db.Column(db.DateTime)
+    reversal_reason = db.Column(db.Text)
     created_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     purchase = db.relationship('Purchase', backref='payments')
 
     def __repr__(self):
         return f'<PaymentMade {self.voucher_no}>'
+
+
+class VendorPaymentAllocation(db.Model):
+    __tablename__ = 'vendor_payment_allocations'
+    id = db.Column(db.Integer, primary_key=True)
+    payment_id = db.Column(db.Integer, db.ForeignKey('payments_made.id', ondelete='CASCADE'), nullable=False)
+    purchase_id = db.Column(db.Integer, db.ForeignKey('purchases.id'), nullable=False)
+    amount = db.Column(db.Numeric(12, 2), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    payment = db.relationship('PaymentMade', backref='allocations')
+    purchase = db.relationship('Purchase', backref='payment_allocations')
 
 
 class ExpenseCategory(db.Model):
@@ -287,3 +349,28 @@ class TCSEntry(db.Model):
     created_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     section = db.relationship('TDSSection', backref='tcs_entries')
+
+
+class ITCEntry(db.Model):
+    __tablename__ = 'itc_entries'
+    id = db.Column(db.Integer, primary_key=True)
+    purchase_id = db.Column(db.Integer, db.ForeignKey('purchases.id'), nullable=False)
+    supplier_id = db.Column(db.Integer, db.ForeignKey('suppliers.id'), nullable=False)
+    invoice_no = db.Column(db.String(50))
+    invoice_date = db.Column(db.Date)
+    taxable_value = db.Column(db.Numeric(12, 2), default=0)
+    input_tax_cgst = db.Column(db.Numeric(12, 2), default=0)
+    input_tax_sgst = db.Column(db.Numeric(12, 2), default=0)
+    input_tax_igst = db.Column(db.Numeric(12, 2), default=0)
+    input_tax_vat = db.Column(db.Numeric(12, 2), default=0)
+    eligible_itc_amount = db.Column(db.Numeric(12, 2), default=0)
+    blocked_itc_amount = db.Column(db.Numeric(12, 2), default=0)
+    ineligible_reason = db.Column(db.String(255))
+    itc_status = db.Column(db.String(20), default='Eligible')
+    claim_period = db.Column(db.String(7))
+    reversal_reason = db.Column(db.String(255))
+    remarks = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    purchase = db.relationship('Purchase', backref='itc_entries')
+    supplier = db.relationship('Supplier', backref='itc_entries')

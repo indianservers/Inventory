@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block content %}
+<form class="panel mb-3" method="get">
+  <div class="row g-2 align-items-end">
+    <div class="col-md-2"><label class="form-label">From</label><input class="form-control" type="date" name="date_from" value="{{ request.args.get('date_from','') }}"></div>
+    <div class="col-md-2"><label class="form-label">To</label><input class="form-control" type="date" name="date_to" value="{{ request.args.get('date_to','') }}"></div>
+    <div class="col-md-2"><label class="form-label">Payment Mode</label><input class="form-control" name="payment_mode" value="{{ request.args.get('payment_mode','') }}"></div>
+    <div class="col-md-2"><label class="form-label">Status/Type</label><input class="form-control" name="status" value="{{ request.args.get('status','') }}"></div>
+    <div class="col-md-2"><label class="form-label">Branch ID</label><input class="form-control" name="branch_id" value="{{ request.args.get('branch_id','') }}"></div>
+    <div class="col-md-2"><label class="form-label">Warehouse ID</label><input class="form-control" name="warehouse_id" value="{{ request.args.get('warehouse_id','') }}"></div>
+    <div class="col-md-2"><label class="form-label">Customer ID</label><input class="form-control" name="customer_id" value="{{ request.args.get('customer_id','') }}"></div>
+    <div class="col-md-2"><label class="form-label">Vendor ID</label><input class="form-control" name="vendor_id" value="{{ request.args.get('vendor_id','') }}"></div>
+    <div class="col-md-2"><label class="form-label">Category ID</label><input class="form-control" name="category_id" value="{{ request.args.get('category_id','') }}"></div>
+    <div class="col-md-2"><label class="form-label">Product ID</label><input class="form-control" name="product_id" value="{{ request.args.get('product_id','') }}"></div>
+    <div class="col-md-2"><label class="form-label">Transaction Type</label><input class="form-control" name="transaction_type" value="{{ request.args.get('transaction_type','') }}"></div>
+    <div class="col-md-4 d-flex gap-2"><button class="btn btn-primary">Filter</button><a class="btn btn-outline-success" href="{{ request.path }}?{{ request.query_string.decode() }}{% if request.query_string %}&{% endif %}export=xlsx">Export Excel</a><button class="btn btn-outline-secondary" type="button" onclick="window.print()">Print</button></div>
+  </div>
+</form>
+<div class="panel">
+  <table class="table datatable">
+    <thead><tr>{% for h in headers %}<th>{{ h }}</th>{% endfor %}</tr></thead>
+    <tbody>{% for row in rows %}<tr>{% for h in headers %}<td>{{ row[h] }}</td>{% endfor %}</tr>{% endfor %}</tbody>
+  </table>
+</div>
+{% endblock %}

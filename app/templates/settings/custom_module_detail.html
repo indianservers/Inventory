@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="detail-hero mb-3">
+  <div>
+    <p class="eyebrow mb-1">Custom Module</p>
+    <h2 class="mb-1"><i class="bi {{ module.icon or 'bi-grid' }}"></i> {{ module.plural_name or module.name }}</h2>
+    <p class="text-muted mb-0">{{ module.description or module.module_key }}</p>
+  </div>
+  <div class="d-flex gap-2 flex-wrap">
+    <a class="btn btn-outline-secondary" href="{{ url_for('integrations.custom_modules') }}">All Modules</a>
+    <span class="badge align-self-center {{ 'text-bg-success' if module.is_active else 'text-bg-secondary' }}">{{ 'Active' if module.is_active else 'Inactive' }}</span>
+  </div>
+</div>
+
+<div class="row g-3">
+  <div class="col-xl-4">
+    <div class="panel mb-3">
+      <h3 class="h5 mb-3">Add Field</h3>
+      <form method="post" action="{{ url_for('integrations.custom_module_fields', id=module.id) }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <label class="form-label">Label</label>
+        <input class="form-control mb-2" name="label" required>
+        <label class="form-label">Field Key</label>
+        <input class="form-control mb-2" name="field_key" placeholder="auto-generated if blank">
+        <label class="form-label">Type</label>
+        <select class="form-select mb-2" name="field_type">
+          {% for value in ["Text","Number","Date","Dropdown","Checkbox","Textarea"] %}<option>{{ value }}</option>{% endfor %}
+        </select>
+        <label class="form-label">Dropdown Options</label>
+        <textarea class="form-control mb-2" name="options" rows="2" placeholder="One option per line"></textarea>
+        <label class="form-label">Sort Order</label>
+        <input class="form-control mb-2" name="sort_order" type="number" value="10">
+        <div class="d-flex gap-3 mb-3">
+          <div class="form-check"><input class="form-check-input" type="checkbox" name="is_required"><label class="form-check-label">Required</label></div>
+          <div class="form-check"><input class="form-check-input" type="checkbox" name="show_in_list" checked><label class="form-check-label">List</label></div>
+        </div>
+        <button class="btn btn-outline-primary w-100">Add Field</button>
+      </form>
+    </div>
+
+    <div class="panel">
+      <h3 class="h5 mb-3">Create Record</h3>
+      <form method="post">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <label class="form-label">Title</label>
+        <input class="form-control mb-2" name="title" required>
+        <label class="form-label">Status</label>
+        <select class="form-select mb-2" name="status"><option>Active</option><option>Inactive</option><option>Draft</option><option>Closed</option></select>
+        {% for field in fields if field.field_key != "title" %}
+          <label class="form-label">{{ field.label }}{% if field.is_required %} <span class="text-danger">*</span>{% endif %}</label>
+          {% if field.field_type == "Textarea" %}
+            <textarea class="form-control mb-2" name="field_{{ field.id }}" rows="3" {% if field.is_required %}required{% endif %}></textarea>
+          {% elif field.field_type == "Dropdown" %}
+            <select class="form-select mb-2" name="field_{{ field.id }}" {% if field.is_required %}required{% endif %}>
+              <option value="">Select</option>
+              {% for option in (field.options or '').replace(',', '\n').splitlines() if option.strip() %}<option>{{ option.strip() }}</option>{% endfor %}
+            </select>
+          {% elif field.field_type == "Checkbox" %}
+            <div class="form-check mb-2"><input class="form-check-input" type="checkbox" name="field_{{ field.id }}"><label class="form-check-label">Yes</label></div>
+          {% else %}
+            <input class="form-control mb-2" name="field_{{ field.id }}" type="{{ 'number' if field.field_type == 'Number' else 'date' if field.field_type == 'Date' else 'text' }}" {% if field.is_required %}required{% endif %}>
+          {% endif %}
+        {% endfor %}
+        <button class="btn btn-primary w-100">Save Record</button>
+      </form>
+    </div>
+  </div>
+
+  <div class="col-xl-8">
+    <div class="panel mb-3">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <h3 class="h5 mb-0">Fields</h3>
+        <span class="badge text-bg-light">{{ fields|length }} active</span>
+      </div>
+      <div class="table-responsive">
+        <table class="table table-sm align-middle">
+          <thead><tr><th>Label</th><th>Key</th><th>Type</th><th>Required</th><th>List</th></tr></thead>
+          <tbody>
+            {% for field in fields %}
+            <tr><td>{{ field.label }}</td><td><code>{{ field.field_key }}</code></td><td>{{ field.field_type }}</td><td>{{ 'Yes' if field.is_required else 'No' }}</td><td>{{ 'Yes' if field.show_in_list else 'No' }}</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <h3 class="h5 mb-0">Records</h3>
+        <span class="badge text-bg-light">{{ record_rows|length }} record(s)</span>
+      </div>
+      {% if record_rows %}
+      <div class="table-responsive">
+        <table class="table table-sm align-middle datatable">
+          <thead>
+            <tr>
+              <th>Title</th>
+              {% for field in fields if field.show_in_list and field.field_key != "title" %}<th>{{ field.label }}</th>{% endfor %}
+              <th>Status</th><th>Updated</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for record, values in record_rows %}
+            <tr>
+              <td><strong>{{ record.title }}</strong></td>
+              {% for field in fields if field.show_in_list and field.field_key != "title" %}<td>{{ values.get(field.field_key) }}</td>{% endfor %}
+              <td><span class="badge {{ 'text-bg-success' if record.status == 'Active' else 'text-bg-secondary' }}">{{ record.status }}</span></td>
+              <td class="text-muted small">{{ record.updated_at.strftime('%d %b %Y') if record.updated_at else '' }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div class="empty-state py-5">
+        <i class="bi bi-journal-plus"></i>
+        <h3>No records yet</h3>
+        <p>Add a record from the form on the left.</p>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}

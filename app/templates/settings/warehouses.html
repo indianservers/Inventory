@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="row g-3">
+  <div class="col-lg-4">
+    <form class="panel" method="post" novalidate>
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <h2 class="h5">Add Warehouse</h2>
+      <label class="form-label">Warehouse Name</label><input class="form-control mb-2" name="name" required>
+      <label class="form-label">Warehouse Code</label><input class="form-control mb-2" name="code" required maxlength="20">
+      <label class="form-label">Branch</label><select class="form-select mb-2" name="branch_id"><option value="">No branch</option>{% for branch in branches %}<option value="{{ branch.id }}">{{ branch.name }}</option>{% endfor %}</select>
+      <label class="form-label">Address</label><textarea class="form-control mb-2" name="address" rows="2"></textarea>
+      <label class="form-label">Contact Person</label><input class="form-control mb-2" name="contact_person">
+      <div class="row g-2">
+        <div class="col-md-6"><label class="form-label">Phone</label><input class="form-control mb-2" name="phone" type="tel"></div>
+        <div class="col-md-6"><label class="form-label">Email</label><input class="form-control mb-2" name="email" type="email"></div>
+      </div>
+      <label class="form-check mb-3"><input class="form-check-input" type="checkbox" name="status" checked> Active</label>
+      <button class="btn btn-primary w-100">Save Warehouse</button>
+    </form>
+  </div>
+  <div class="col-lg-8">
+    <div class="panel">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2 class="h5 mb-0">Warehouses</h2>
+        <form><select class="form-select form-select-sm" name="status" onchange="this.form.submit()">{% for key,label in [('all','All'),('active','Active'),('inactive','Inactive')] %}<option value="{{ key }}" {% if status == key %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></form>
+      </div>
+      <table class="table datatable align-middle">
+        <thead><tr><th>Code</th><th>Name</th><th>Branch</th><th>Status</th><th></th></tr></thead>
+        <tbody>{% for warehouse in warehouses %}
+        <tr>
+          <td>{{ warehouse.code }}</td><td>{{ warehouse.name }}</td><td>{{ warehouse.branch.name if warehouse.branch else '-' }}</td>
+          <td><span class="badge {{ 'text-bg-success' if warehouse.status else 'text-bg-secondary' }}">{{ 'Active' if warehouse.status else 'Inactive' }}</span></td>
+          <td class="text-end"><a class="btn btn-sm btn-outline-primary" href="{{ url_for('settings.warehouse_edit', id=warehouse.id) }}">Edit</a> <form class="d-inline" method="post" action="{{ url_for('settings.warehouse_toggle', id=warehouse.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn btn-sm btn-outline-secondary">{{ 'Deactivate' if warehouse.status else 'Reactivate' }}</button></form></td>
+        </tr>
+        {% endfor %}</tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

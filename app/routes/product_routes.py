@@ -10,7 +10,8 @@ from openpyxl import Workbook, load_workbook
 from werkzeug.utils import secure_filename
 
 from app.extensions import db
-from app.models import Brand, Category, Product, ProductImage, Tax, Unit, Warehouse
+from app.models import Brand, Category, Product, ProductImage, ProductVariant, Supplier, Tax, Unit, Warehouse
+from app.utils.tax_validation import is_valid_hsn
 
 bp = Blueprint("products", __name__, url_prefix="/products")
 
@@ -22,6 +23,7 @@ def load_choices():
         "units": Unit.query.order_by(Unit.name).all(),
         "taxes": Tax.query.order_by(Tax.name).all(),
         "warehouses": Warehouse.query.order_by(Warehouse.name).all(),
+        "suppliers": Supplier.query.order_by(Supplier.name).all(),
     }
 
 
@@ -31,13 +33,16 @@ def save_product(product):
     if existing:
         raise ValueError("SKU already exists.")
     product.sku = sku
-    product.barcode = request.form.get("barcode")
+    product.barcode = request.form.get("barcode") or _barcode_from_sku(sku)
     product.name = request.form["name"]
     product.description = request.form.get("description")
     product.category_id = request.form.get("category_id") or None
     product.brand_id = request.form.get("brand_id") or None
     product.unit_id = request.form.get("unit_id") or None
     product.tax_id = request.form.get("tax_id") or None
+    product.preferred_supplier_id = request.form.get("preferred_supplier_id") or None
+    if not is_valid_hsn(request.form.get("hsn_code")):
+        raise ValueError("Invalid HSN/SAC code. Use 4 to 8 digits.")
     product.hsn_code = request.form.get("hsn_code")
     for field in ["purchase_price", "sales_price", "mrp", "opening_stock", "min_stock", "max_stock", "reorder_level"]:
         setattr(product, field, request.form.get(field) or 0)
@@ -47,10 +52,60 @@ def save_product(product):
         product.created_by = current_user.id
     product.warehouse_id = request.form.get("warehouse_id") or None
     product.rack_bin = request.form.get("rack_bin")
+    product.track_inventory = bool(request.form.get("track_inventory"))
     product.batch_tracking = bool(request.form.get("batch_tracking"))
     product.serial_tracking = bool(request.form.get("serial_tracking"))
     product.expiry_tracking = bool(request.form.get("expiry_tracking"))
     product.is_active = bool(request.form.get("is_active"))
+
+
+def _barcode_from_sku(sku):
+    digits = "".join(str(ord(ch)) for ch in sku)[-10:].rjust(10, "0")
+    return f"89{digits}"
+
+
+def save_variants(product):
+    existing = {str(variant.id): variant for variant in product.variants.all()} if product.id else {}
+    seen = set()
+    for variant_id, sku, barcode, size, color, weight, model, packaging, purchase_price, sales_price, mrp, current_stock in zip(
+        request.form.getlist("variant_id[]"),
+        request.form.getlist("variant_sku[]"),
+        request.form.getlist("variant_barcode[]"),
+        request.form.getlist("variant_size[]"),
+        request.form.getlist("variant_color[]"),
+        request.form.getlist("variant_weight[]"),
+        request.form.getlist("variant_model[]"),
+        request.form.getlist("variant_packaging[]"),
+        request.form.getlist("variant_purchase_price[]"),
+        request.form.getlist("variant_sales_price[]"),
+        request.form.getlist("variant_mrp[]"),
+        request.form.getlist("variant_stock[]"),
+    ):
+        sku = (sku or "").strip()
+        if not sku:
+            continue
+        duplicate = ProductVariant.query.filter(ProductVariant.sku == sku, ProductVariant.id != int(variant_id or 0)).first()
+        if duplicate:
+            raise ValueError(f"Variant SKU already exists: {sku}")
+        variant = existing.get(variant_id) or ProductVariant(product_id=product.id)
+        variant.sku = sku
+        variant.barcode = barcode or _barcode_from_sku(sku)
+        variant.size = size
+        variant.color = color
+        variant.weight = weight
+        variant.model = model
+        variant.packaging = packaging
+        variant.purchase_price = purchase_price or 0
+        variant.sales_price = sales_price or 0
+        variant.mrp = mrp or 0
+        variant.current_stock = current_stock or 0
+        variant.is_active = True
+        db.session.add(variant)
+        if variant_id:
+            seen.add(variant_id)
+    for variant_id, variant in existing.items():
+        if variant_id not in seen:
+            variant.is_active = False
 
 
 def save_product_images(product):
@@ -75,6 +130,8 @@ def save_product_images(product):
 @login_required
 def index():
     search = request.args.get("q", "").strip()
+    category_id = request.args.get("category_id")
+    stock_status = request.args.get("stock_status", "all")
     query = Product.query
     if search:
         like = f"%{search}%"
@@ -87,8 +144,19 @@ def index():
                 Product.rack_bin.ilike(like),
             )
         )
+    if category_id:
+        query = query.filter(Product.category_id == category_id)
+    if stock_status == "low":
+        query = query.filter(Product.min_stock > 0, Product.current_stock <= Product.min_stock)
+    elif stock_status == "out":
+        query = query.filter(Product.current_stock <= 0)
+    elif stock_status == "active":
+        query = query.filter(Product.is_active.is_(True))
+    elif stock_status == "inactive":
+        query = query.filter(Product.is_active.is_(False))
     products = query.order_by(Product.id.desc()).all()
-    return render_template("products/index.html", title="Products", products=products, search=search)
+    selected_product = Product.query.get(request.args.get("selected")) if request.args.get("selected") else (products[0] if products else None)
+    return render_template("products/index.html", title="Item Master", products=products, selected_product=selected_product, search=search, categories=Category.query.order_by(Category.name).all(), category_id=category_id, stock_status=stock_status)
 
 
 @bp.route("/export")
@@ -212,6 +280,7 @@ def create():
             save_product(product)
             db.session.add(product)
             db.session.flush()
+            save_variants(product)
             save_product_images(product)
             db.session.commit()
             flash("Product created.", "success")
@@ -229,6 +298,7 @@ def edit(id):
     if request.method == "POST":
         try:
             save_product(product)
+            save_variants(product)
             save_product_images(product)
             db.session.commit()
             flash("Product updated.", "success")
@@ -269,3 +339,21 @@ def delete(id):
     db.session.commit()
     flash("Product marked inactive.", "success")
     return redirect(url_for("products.index"))
+
+
+@bp.route("/barcode-labels")
+@login_required
+def barcode_labels():
+    ids = request.args.getlist("id")
+    query = Product.query
+    if ids:
+        query = query.filter(Product.id.in_(ids))
+    products = query.order_by(Product.name).limit(100).all()
+    labels = []
+    for product in products:
+        payload = product.barcode or product.sku
+        image = qrcode.make(payload)
+        output = BytesIO()
+        image.save(output, format="PNG")
+        labels.append({"product": product, "barcode": payload, "qr_data": base64.b64encode(output.getvalue()).decode("ascii")})
+    return render_template("products/barcode_labels.html", title="Barcode Labels", products=Product.query.order_by(Product.name).all(), labels=labels)
