@@ -18,7 +18,7 @@
       <h2 class="h5">Serial Numbers</h2>
       <table class="table datatable align-middle">
         <thead><tr><th>Serial</th><th>Product</th><th>Warehouse</th><th>Status</th><th>Sale</th></tr></thead>
-        <tbody>{% for serial in serials %}<tr><td>{{ serial.serial_no }}</td><td>{{ serial.product.name }}</td><td>{{ serial.warehouse.name if serial.warehouse else '-' }}</td><td>{{ serial.status }}</td><td>{{ serial.sale_id or '-' }}</td></tr>{% endfor %}</tbody>
+        <tbody>{% for serial in serials %}<tr><td><span data-copy-ref="{{ serial.serial_no }}">{{ serial.serial_no }}</span></td><td>{{ serial.product.name }}</td><td>{{ serial.warehouse.name if serial.warehouse else '-' }}</td><td>{{ serial.status }}</td><td>{{ serial.sale_id or '-' }}</td></tr>{% endfor %}</tbody>
       </table>
     </div>
   </div>

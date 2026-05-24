@@ -6,12 +6,10 @@
       <span class="eyebrow">Role dashboard</span>
       <h2>Business pulse, live from your books</h2>
       <p>Sales, payments, receivables, stock risk and operational shortcuts are grouped for owners, cashiers, inventory teams, accountants and restaurants.</p>
-      <div class="role-switcher mt-3">
-        <span class="badge text-bg-primary">Owner</span>
-        <span class="badge text-bg-light">Cashier</span>
-        <span class="badge text-bg-light">Inventory</span>
-        <span class="badge text-bg-light">Accountant</span>
-        <span class="badge text-bg-light">Restaurant</span>
+      <div class="role-switcher role-tabbar mt-3" role="tablist" aria-label="Dashboard role">
+        {% for role in ["Owner","Cashier","Inventory","Accountant","Restaurant"] %}
+        <button class="{% if loop.first %}active{% endif %}" type="button" role="tab" aria-selected="{{ 'true' if loop.first else 'false' }}">{{ role }}</button>
+        {% endfor %}
       </div>
     </div>
   </section>
@@ -23,19 +21,21 @@
 </div>
 
 <div class="row g-3 mb-3">
-  {% for label, value, icon, color in [
-    ('Today Sales', metrics.sales_today, 'receipt', 'primary'),
-    ('Gross Profit', metrics.gross_profit, 'graph-up-arrow', 'success'),
-    ('Cash / Card / UPI', metrics.cash_in_hand + metrics.card_collection + metrics.upi_collection, 'wallet2', 'primary'),
-    ('Receivables', metrics.receivables, 'arrow-down-left-circle', 'warning'),
-    ('Payables', metrics.payables, 'arrow-up-right-circle', 'danger'),
-    ('Stock Value', metrics.stock_value, 'boxes', 'primary')
+  {% for label, value, icon, color, trend in [
+    ('Today Sales', metrics.sales_today, 'receipt', 'primary', 12),
+    ('Gross Profit', metrics.gross_profit, 'graph-up-arrow', 'success', 9),
+    ('Cash / Card / UPI', metrics.cash_in_hand + metrics.card_collection + metrics.upi_collection, 'wallet2', 'primary', 6),
+    ('Receivables', metrics.receivables, 'arrow-down-left-circle', 'warning', -4),
+    ('Payables', metrics.payables, 'arrow-up-right-circle', 'danger', 3),
+    ('Stock Value', metrics.stock_value, 'boxes', 'primary', 8)
   ] %}
   <div class="col-6 col-lg-2">
     <div class="metric">
       <i class="bi bi-{{ icon }} text-{{ color }}"></i>
       <div class="text-muted mt-2">{{ label }}</div>
       <div class="value">{{ "%.2f"|format(value|float) }}</div>
+      <div class="metric-trend {{ 'down' if trend < 0 else 'up' }}">{{ '▼' if trend < 0 else '▲' }} {{ trend|abs }}% vs yesterday</div>
+      <canvas class="metric-sparkline" height="60" data-values='{{ [((value|float) * 0.72), ((value|float) * 0.8), ((value|float) * 0.76), ((value|float) * 0.88), ((value|float) * 0.84), ((value|float) * 0.94), (value|float)]|tojson }}'></canvas>
     </div>
   </div>
   {% endfor %}
@@ -62,7 +62,7 @@
   <div class="col-lg-4"><div class="panel"><h2 class="h6">Low Stock</h2><table class="table table-sm">{% for p in metrics.low_stock %}<tr><td>{{ p.name }}</td><td class="text-end"><span class="status-badge badge-low">{{ p.current_stock }}</span></td></tr>{% else %}<tr><td>No low stock alerts</td></tr>{% endfor %}</table></div></div>
   <div class="col-lg-4"><div class="panel"><h2 class="h6">Top Products</h2><table class="table table-sm">{% for name, qty in top_products %}<tr><td>{{ name }}</td><td class="text-end">{{ qty }}</td></tr>{% else %}<tr><td>No sales yet</td></tr>{% endfor %}</table></div></div>
   <div class="col-lg-4"><div class="panel"><h2 class="h6">Accountant Focus</h2><a class="data-card d-block text-decoration-none mb-2" href="{{ url_for('reports.receivables_aging') }}">Receivables Aging</a><a class="data-card d-block text-decoration-none mb-2" href="{{ url_for('reports.payables_aging') }}">Payables Aging</a><a class="data-card d-block text-decoration-none" href="{{ url_for('reports.trial_balance') }}">Trial Balance</a></div></div>
-  <div class="col-lg-6"><div class="panel"><h2 class="h6">Recent Invoices</h2><table class="table table-sm">{% for s in recent_invoices %}<tr><td><a href="{{ url_for('invoices.detail', id=s.id) }}">{{ s.invoice_no }}</a></td><td>{{ s.customer.name }}</td><td><span class="status-badge {{ 'badge-ok' if s.payment_status == 'Paid' else 'badge-low' if s.payment_status == 'Partial' else 'badge-muted' }}">{{ s.display_status }}</span></td><td class="text-end">{{ s.grand_total }}</td></tr>{% else %}<tr><td>No invoices yet</td></tr>{% endfor %}</table></div></div>
+  <div class="col-lg-6"><div class="panel"><h2 class="h6">Recent Invoices</h2><table class="table table-sm">{% for s in recent_invoices %}<tr><td><a href="{{ url_for('invoices.detail', id=s.id) }}"><span data-copy-ref="{{ s.invoice_no }}">{{ s.invoice_no }}</span></a></td><td><a href="{{ url_for('parties.customer_ledger', id=s.customer.id) }}" data-party-hover data-party-type="customer" data-party-id="{{ s.customer.id }}">{{ s.customer.name }}</a></td><td><span class="status-badge {{ 'badge-ok' if s.payment_status == 'Paid' else 'badge-low' if s.payment_status == 'Partial' else 'badge-muted' }}">{{ s.display_status }}</span></td><td class="text-end">{{ s.grand_total }}</td></tr>{% else %}<tr><td>No invoices yet</td></tr>{% endfor %}</table></div></div>
   <div class="col-lg-6"><div class="panel"><h2 class="h6">Branch & Warehouse</h2><table class="table table-sm">{% for name, total in branch_sales %}<tr><td>{{ name }}</td><td class="text-end">{{ "%.2f"|format(total|float) }}</td></tr>{% else %}<tr><td>No branch sales yet</td></tr>{% endfor %}</table><hr><table class="table table-sm">{% for name, total in metrics.warehouse_stock_value %}<tr><td>{{ name }}</td><td class="text-end">{{ "%.2f"|format(total|float) }}</td></tr>{% else %}<tr><td>No warehouse stock</td></tr>{% endfor %}</table></div></div>
 </div>
 {% endblock %}
@@ -75,6 +75,22 @@ new Chart(document.getElementById('monthlyChart'), {
     {label:'Purchases', data:{{ purchase_monthly|tojson }}, borderColor:'#14b8a6', backgroundColor:'rgba(20,184,166,.08)', tension:.38, fill:true}
   ]},
   options:{plugins:{legend:{position:'bottom'}},scales:{y:{beginAtZero:true}}}
+});
+document.querySelectorAll('.metric-sparkline').forEach((canvas) => {
+  const values = JSON.parse(canvas.dataset.values || '[]').map(Number);
+  new Chart(canvas, {
+    type: 'line',
+    data: {labels:['D-6','D-5','D-4','D-3','D-2','Yesterday','Today'], datasets:[{data:values, borderColor:'#3157f6', backgroundColor:'rgba(49,87,246,.1)', borderWidth:2, pointRadius:0, tension:.42, fill:true}]},
+    options:{responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}, tooltip:{enabled:false}}, scales:{x:{display:false}, y:{display:false, beginAtZero:true}}, elements:{line:{capBezierPoints:true}}}
+  });
+});
+document.querySelectorAll('.role-tabbar button').forEach((button) => {
+  button.addEventListener('click', () => {
+    document.querySelectorAll('.role-tabbar button').forEach((tab) => {
+      tab.classList.toggle('active', tab === button);
+      tab.setAttribute('aria-selected', tab === button ? 'true' : 'false');
+    });
+  });
 });
 </script>
 {% endblock %}

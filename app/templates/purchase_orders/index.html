@@ -6,7 +6,7 @@
     <div class="d-flex gap-2"><a class="btn btn-outline-primary" href="{{ url_for('purchase_orders.grn_create') }}">Direct GRN</a><a class="btn btn-primary" href="{{ url_for('purchase_orders.create') }}"><i class="bi bi-plus-lg"></i> PO</a></div>
   </div>
   <table class="table datatable align-middle"><thead><tr><th>No</th><th>Date</th><th>Supplier</th><th>Expected</th><th>Total</th><th>Status</th><th></th></tr></thead><tbody>{% for po in orders %}<tr>
-    <td><a href="{{ url_for('purchase_orders.detail', id=po.id) }}">{{ po.po_no }}</a></td><td>{{ po.po_date }}</td><td>{{ po.supplier.name }}</td><td>{{ po.expected_date or '' }}</td><td>{{ po.grand_total }}</td><td><span class="badge text-bg-primary">{{ po.status }}</span></td>
+    <td><a href="{{ url_for('purchase_orders.detail', id=po.id) }}"><span data-copy-ref="{{ po.po_no }}">{{ po.po_no }}</span></a></td><td>{{ po.po_date }}</td><td><a href="{{ url_for('parties.supplier_ledger', id=po.supplier.id) }}" data-party-hover data-party-type="supplier" data-party-id="{{ po.supplier.id }}">{{ po.supplier.name }}</a></td><td>{{ po.expected_date or '' }}</td><td>{{ po.grand_total }}</td><td><span class="badge text-bg-primary">{{ po.status }}</span></td>
     <td class="table-actions"><a class="btn btn-sm btn-outline-secondary" href="{{ url_for('purchase_orders.print_po', id=po.id) }}"><i class="bi bi-printer"></i></a><a class="btn btn-sm btn-outline-success" href="{{ url_for('purchase_orders.grn_from_po', id=po.id) }}"><i class="bi bi-box-arrow-in-down"></i></a></td>
   </tr>{% endfor %}</tbody></table>
 </div>

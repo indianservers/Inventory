@@ -1,22 +1,31 @@
 {% extends "base.html" %}
 {% block content %}
-<div class="panel mb-3">
+<div class="panel mb-3 sticky-filter-bar">
+  <div class="module-header">
+    <div>
+      <span class="eyebrow">Sales</span>
+      <h2>Invoices</h2>
+    </div>
+    <a class="btn btn-primary" href="{{ url_for('invoices.create') }}"><i class="bi bi-plus-lg"></i> New Invoice</a>
+  </div>
   <form class="row g-2 align-items-end" method="get">
     <div class="col-md-2"><label class="form-label">Status</label><select class="form-select" name="status"><option value="">All</option>{% for status in statuses %}<option value="{{ status }}" {% if request.args.get('status') == status %}selected{% endif %}>{{ status }}</option>{% endfor %}</select></div>
     <div class="col-md-3"><label class="form-label">Customer</label><select class="form-select" name="customer_id"><option value="">All</option>{% for customer in customers %}<option value="{{ customer.id }}" {% if request.args.get('customer_id') == customer.id|string %}selected{% endif %}>{{ customer.name }}</option>{% endfor %}</select></div>
     <div class="col-md-2"><label class="form-label">From</label><input class="form-control" type="date" name="date_from" value="{{ request.args.get('date_from','') }}"></div>
     <div class="col-md-2"><label class="form-label">To</label><input class="form-control" type="date" name="date_to" value="{{ request.args.get('date_to','') }}"></div>
-    <div class="col-md-3 d-flex gap-2"><button class="btn btn-outline-secondary"><i class="bi bi-funnel"></i></button><a class="btn btn-outline-secondary" href="{{ url_for('invoices.index') }}"><i class="bi bi-x-lg"></i></a><a class="btn btn-primary ms-auto" href="{{ url_for('invoices.create') }}"><i class="bi bi-plus-lg"></i> Invoice</a></div>
+    <div class="col-md-3 d-flex gap-2"><button class="btn btn-outline-secondary"><i class="bi bi-funnel"></i></button><a class="btn btn-outline-secondary" href="{{ url_for('invoices.index') }}"><i class="bi bi-x-lg"></i></a></div>
   </form>
 </div>
 <div class="panel">
-  <table class="table datatable">
-    <thead><tr><th>No</th><th>Date</th><th>Due</th><th>Customer</th><th>Total</th><th>Paid</th><th>Balance</th><th>Status</th><th></th></tr></thead>
+  <table class="table datatable" id="invoice-table">
+    <thead><tr><th class="select-col"><input class="form-check-input bulk-check-all" type="checkbox" aria-label="Select all invoices"></th><th>No</th><th>Date</th><th>Due</th><th>Customer</th><th>Total</th><th>Paid</th><th>Balance</th><th>Status</th><th></th></tr></thead>
     <tbody>
       {% for invoice in invoices %}
-      <tr>
-        <td><a href="{{ url_for('invoices.detail', id=invoice.id) }}">{{ invoice.invoice_no }}</a></td>
-        <td>{{ invoice.invoice_date }}</td><td>{{ invoice.due_date or '' }}</td><td>{{ invoice.customer.name }}</td>
+      {% set overdue_days = (today - invoice.due_date).days if invoice.due_date and invoice.balance_amount and invoice.balance_amount > 0 and invoice.display_status not in ['Paid','Cancelled'] and invoice.due_date < today else 0 %}
+      <tr class="{{ 'row-severely-overdue' if overdue_days >= 60 else 'row-overdue' if overdue_days > 0 else '' }}" data-context-menu data-row-open="{{ url_for('invoices.detail', id=invoice.id) }}" data-row-ref="{{ invoice.invoice_no }}" data-row-pay-url="{{ url_for('invoices.payment', id=invoice.id) }}" data-row-balance="{{ invoice.balance_amount or 0 }}">
+        <td class="row-select-cell"><input class="form-check-input row-select" type="checkbox" aria-label="Select {{ invoice.invoice_no }}"></td>
+        <td><a href="{{ url_for('invoices.detail', id=invoice.id) }}"><span data-copy-ref="{{ invoice.invoice_no }}">{{ invoice.invoice_no }}</span></a></td>
+        <td>{{ invoice.invoice_date }}</td><td>{{ invoice.due_date or '' }}</td><td class="truncate-cell" title="{{ invoice.customer.name }}"><a href="{{ url_for('parties.customer_ledger', id=invoice.customer.id) }}" data-party-hover data-party-type="customer" data-party-id="{{ invoice.customer.id }}">{{ invoice.customer.name }}</a></td>
         <td>{{ invoice.grand_total }}</td><td>{{ invoice.paid_amount }}</td><td>{{ invoice.balance_amount }}</td>
         <td><span class="badge text-bg-{{ 'success' if invoice.display_status == 'Paid' else 'danger' if invoice.display_status in ['Overdue','Cancelled'] else 'warning' if invoice.display_status == 'Draft' else 'primary' }}">{{ invoice.display_status }}</span></td>
         <td class="table-actions"><a class="btn btn-sm btn-outline-secondary" href="{{ url_for('invoices.print_invoice', id=invoice.id) }}"><i class="bi bi-printer"></i></a><a class="btn btn-sm btn-outline-primary" href="{{ url_for('invoices.pdf', id=invoice.id) }}"><i class="bi bi-filetype-pdf"></i></a>{% if config.RAZORPAY_KEY_ID %}<button class="btn btn-sm btn-outline-success" type="button" onclick="navigator.clipboard.writeText('{{ url_for('invoices.pay', id=invoice.id, _external=True) }}')"><i class="bi bi-link"></i></button>{% endif %}</td>

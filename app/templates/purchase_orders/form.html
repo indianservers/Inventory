@@ -2,6 +2,11 @@
 {% block content %}
 <form class="panel" method="post">
   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <div class="flow-stepbar" aria-label="Purchase flow progress">
+    <span class="active">Step 1: PO</span>
+    <span>Step 2: GRN</span>
+    <span>Step 3: Purchase Bill</span>
+  </div>
   <div class="form-grid">
     <div><label class="form-label">PO No</label><input class="form-control" name="po_no" value="{{ po_no }}" required></div>
     <div><label class="form-label">PO Date</label><input class="form-control" type="date" name="po_date" value="{{ today }}" required></div>

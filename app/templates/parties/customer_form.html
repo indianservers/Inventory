@@ -5,6 +5,7 @@
 <div><label class="form-label">{{ label }}</label><input class="form-control" name="{{ name }}" value="{{ item|attr(name) or '' }}" {% if req %}required{% endif %}></div>
 {% endfor %}
 <div><label class="form-label">Customer Type</label><select class="form-select" name="customer_type">{% for typ in ['Retail','Wholesale','Corporate'] %}<option value="{{ typ }}" {% if item.customer_type == typ %}selected{% endif %}>{{ typ }}</option>{% endfor %}</select></div>
+<div class="full"><label class="form-label">Tags</label><div class="tag-checkbox-grid">{% for tag in party_tags %}<label class="party-tag tag-{{ tag|lower|replace(' ', '-') }}"><input type="checkbox" name="tags" value="{{ tag }}" {% if tag in item.tag_list %}checked{% endif %}> {{ tag }}</label>{% endfor %}</div></div>
 <div class="full"><label class="form-label">Billing Address</label><textarea class="form-control" name="billing_address">{{ item.billing_address or '' }}</textarea></div>
 <div class="full"><label class="form-label">Shipping Address</label><textarea class="form-control" name="shipping_address">{{ item.shipping_address or '' }}</textarea></div>
 <label class="form-check full"><input class="form-check-input" name="status" type="checkbox" {% if item.status %}checked{% endif %}> Active</label></div>

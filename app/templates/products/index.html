@@ -10,13 +10,13 @@
     <a class="btn btn-outline-secondary" href="{{ url_for('products.import_products') }}"><i class="bi bi-upload"></i> Import</a>
     <a class="btn btn-outline-secondary" href="{{ url_for('products.export', format='xlsx') }}"><i class="bi bi-file-earmark-excel"></i> Export</a>
     <a class="btn btn-outline-secondary" href="{{ url_for('products.barcode_labels') }}"><i class="bi bi-upc-scan"></i> Barcode Labels</a>
-    <a class="btn btn-primary" href="{{ url_for('products.create') }}"><i class="bi bi-plus-lg"></i> New Item</a>
+    <a class="btn btn-primary" href="{{ url_for('products.create') }}"><i class="bi bi-plus-lg"></i> New Product</a>
   </div>
 </div>
 
 <div class="item-master-layout">
   <aside class="item-list-panel">
-    <form class="item-filter-stack" method="get">
+    <form class="item-filter-stack sticky-filter-bar" method="get">
       <div class="input-group">
         <span class="input-group-text"><i class="bi bi-search"></i></span>
         <input class="form-control" name="q" value="{{ search or '' }}" placeholder="Search name, SKU, barcode, HSN">
@@ -40,10 +40,11 @@
     </div>
     <div class="item-list">
       {% for p in products %}
+      {% set img = p.images.filter_by(is_primary=True).first() or p.images.first() %}
       <a class="item-list-row {% if selected_product and selected_product.id == p.id %}active{% endif %}" href="{{ url_for('products.index', selected=p.id, q=search, category_id=category_id, stock_status=stock_status) }}">
-        <span class="item-avatar">{{ p.name[:1] }}</span>
+        <span class="item-avatar product-thumb">{% if img %}<img src="{{ url_for('static', filename=img.image_path) }}" alt="{{ p.name }}">{% else %}<i class="bi bi-box-seam"></i>{% endif %}</span>
         <span>
-          <strong>{{ p.name }}</strong>
+          <strong class="truncate-cell" title="{{ p.name }}">{{ p.name }}</strong>
           <small>{{ p.sku }}{% if p.barcode %} · {{ p.barcode }}{% endif %}</small>
         </span>
         <em class="status-badge {{ 'badge-low' if p.is_low_stock else ('badge-muted' if not p.is_active else 'badge-ok') }}">{{ 'Low' if p.is_low_stock else ('Inactive' if not p.is_active else 'Active') }}</em>

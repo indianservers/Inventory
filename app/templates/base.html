@@ -19,6 +19,10 @@
     <span class="brand-mark"><i class="bi bi-grid-1x2"></i></span>
     <span><strong>Vyapara</strong><small>ERP Command</small></span>
   </div>
+  <section class="sidebar-favorites" aria-label="Pinned favorites">
+    <div class="nav-title">Favorites</div>
+    <div id="favoriteLinks" class="favorite-links"></div>
+  </section>
   <nav class="nav-accordion">
     <a class="nav-leaf" href="{{ url_for('dashboard.index') }}"><i class="bi bi-speedometer2"></i> Dashboard</a>
     <details open>
@@ -142,6 +146,19 @@
     <div class="page-title">
       <h1>{{ title or "Dashboard" }}</h1>
       <small>{{ company.company_name if company else "Vyapara ERP" }}</small>
+      {% set path_parts = request.path.strip('/').split('/') if request.path.strip('/') else [] %}
+      {% if path_parts|length > 1 %}
+      <nav aria-label="breadcrumb" class="page-breadcrumb">
+        <ol class="breadcrumb mb-0">
+          <li class="breadcrumb-item"><a href="{{ url_for('dashboard.index') }}">Dashboard</a></li>
+          {% for part in path_parts %}
+          <li class="breadcrumb-item {% if loop.last %}active{% endif %}" {% if loop.last %}aria-current="page"{% endif %}>
+            {% if loop.last %}{{ part.replace('-', ' ').replace('_', ' ')|title }}{% else %}<span>{{ part.replace('-', ' ').replace('_', ' ')|title }}</span>{% endif %}
+          </li>
+          {% endfor %}
+        </ol>
+      </nav>
+      {% endif %}
     </div>
     <form class="command-search" action="{{ url_for('search.index') }}" method="get">
       <span><i class="bi bi-search"></i></span>
@@ -191,6 +208,7 @@
     <a href="{{ url_for('pos.index') }}"><i class="bi bi-calculator"></i><span>POS</span></a>
     <a href="{{ url_for('reports.index') }}"><i class="bi bi-three-dots"></i><span>More</span></a>
   </nav>
+  <button class="scroll-top-button" id="scrollTopButton" type="button" aria-label="Scroll to top"><i class="bi bi-arrow-up"></i></button>
 </main>
 {% else %}
   {% include "_flash.html" %}

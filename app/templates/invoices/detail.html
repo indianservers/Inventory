@@ -4,11 +4,11 @@
   <div class="col-lg-8">
     <div class="panel">
       <div class="d-flex justify-content-between align-items-start mb-3">
-        <div><h2 class="h5 mb-1">{{ invoice.invoice_no }}</h2><div class="text-muted">{{ invoice.invoice_date }}{% if invoice.due_date %} | Due {{ invoice.due_date }}{% endif %}</div></div>
+        <div><h2 class="h5 mb-1"><span data-copy-ref="{{ invoice.invoice_no }}">{{ invoice.invoice_no }}</span></h2><div class="text-muted">{{ invoice.invoice_date }}{% if invoice.due_date %} | Due {{ invoice.due_date }}{% endif %}</div></div>
         <span class="badge text-bg-{{ 'success' if invoice.display_status == 'Paid' else 'danger' if invoice.display_status in ['Overdue','Cancelled'] else 'warning' if invoice.display_status == 'Draft' else 'primary' }}">{{ invoice.display_status }}</span>
       </div>
       <div class="row g-3 mb-3">
-        <div class="col-md-6"><div class="text-muted">Bill To</div><strong>{{ invoice.customer.name }}</strong><div>{{ invoice.customer.billing_address or '' }}</div><div>{{ invoice.customer.phone or '' }}</div><div>{{ invoice.customer.gst_number or '' }}</div></div>
+        <div class="col-md-6"><div class="text-muted">Bill To</div><strong><a href="{{ url_for('parties.customer_ledger', id=invoice.customer.id) }}" data-party-hover data-party-type="customer" data-party-id="{{ invoice.customer.id }}">{{ invoice.customer.name }}</a></strong><div>{{ invoice.customer.billing_address or '' }}</div><div>{{ invoice.customer.phone or '' }}</div><div>{{ invoice.customer.gst_number or '' }}</div></div>
         <div class="col-md-6"><div class="text-muted">Warehouse</div><strong>{{ invoice.warehouse.name }}</strong><div>Outstanding: {{ "%.2f"|format(invoice.customer.outstanding) }}</div></div>
       </div>
       <table class="table">

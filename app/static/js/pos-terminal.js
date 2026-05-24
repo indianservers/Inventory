@@ -6,6 +6,7 @@ const POS = {
   submitting: false,
   activeLine: null,
   heldRows: [],
+  activeQtyIndex: null,
 };
 
 const qs = (sel, root = document) => root.querySelector(sel);
@@ -51,6 +52,23 @@ function saveCartState() {
 }
 function clearCartState() {
   try { localStorage.removeItem(cartStorageKey()); } catch (error) { console.warn("Unable to clear POS cart", error); }
+}
+function recentProductsKey() {
+  return `vyapara_pos_recent_${terminal()?.dataset.warehouseId || "default"}`;
+}
+function recentProductIds() {
+  try { return JSON.parse(localStorage.getItem(recentProductsKey()) || "[]"); }
+  catch { return []; }
+}
+function rememberRecentProducts(items) {
+  const ids = items.map(item => String(item.product_id || item.id));
+  const next = [...new Set([...ids, ...recentProductIds()])].slice(0, 10);
+  try { localStorage.setItem(recentProductsKey(), JSON.stringify(next)); } catch (error) { console.warn("Unable to save recent POS products", error); }
+  markRecentProductTiles();
+}
+function markRecentProductTiles() {
+  const recent = new Set(recentProductIds());
+  qsa(".pos-product").forEach(tile => tile.classList.toggle("recent-product", recent.has(String(tile.dataset.id))));
 }
 function restoreCartState() {
   try {
@@ -166,7 +184,8 @@ function renderCart() {
   const empty = qs("#cartEmpty");
   empty.hidden = POS.cart.length > 0;
   holder.innerHTML = POS.cart.map((item, idx) => `
-    <article class="cart-line ${validateLine(item) ? 'border-warning' : ''}">
+    <article class="cart-line swipe-row ${validateLine(item) ? 'border-warning' : ''}" data-swipe-index="${idx}">
+      <button class="swipe-delete" type="button" data-remove="${idx}"><i class="bi bi-trash"></i></button>
       <div class="cart-line-top">
         <div class="cart-line-title">
           <strong>${esc(item.name)}</strong>
@@ -246,14 +265,45 @@ function bindCartEvents() {
     }
     renderCart();
   });
+  qs("#cartItems").addEventListener("focusin", event => {
+    const qty = event.target.closest("[data-qty]");
+    if (!qty || window.matchMedia("(pointer: fine)").matches) return;
+    POS.activeQtyIndex = Number(qty.dataset.qty);
+    qs("#numpadValue").value = POS.cart[POS.activeQtyIndex]?.qty || "";
+    new bootstrap.Modal(qs("#qtyNumpadModal")).show();
+  });
+  bindSwipeToRemove();
+}
+
+function bindSwipeToRemove() {
+  const holder = qs("#cartItems");
+  let startX = 0;
+  let activeRow = null;
+  holder.addEventListener("touchstart", event => {
+    activeRow = event.target.closest(".swipe-row");
+    startX = event.touches[0]?.clientX || 0;
+  }, {passive: true});
+  holder.addEventListener("touchmove", event => {
+    if (!activeRow) return;
+    const delta = Math.min(0, (event.touches[0]?.clientX || 0) - startX);
+    activeRow.style.transform = `translateX(${Math.max(delta, -88)}px)`;
+    activeRow.classList.toggle("swiped", delta < -44);
+  }, {passive: true});
+  holder.addEventListener("touchend", () => {
+    if (!activeRow) return;
+    activeRow.style.transform = activeRow.classList.contains("swiped") ? "translateX(-88px)" : "";
+    activeRow = null;
+  });
 }
 
 function filterProducts() {
   const query = qs("#posSearch").value.trim().toLowerCase();
   const category = qs(".category-ribbon .active")?.dataset.category || "all";
+  const recent = new Set(recentProductIds());
   let visible = 0;
   qsa(".pos-product").forEach(tile => {
-    const match = (!query || tile.dataset.search.includes(query) || tile.dataset.barcode === query || tile.dataset.sku.toLowerCase() === query) && (category === "all" || tile.dataset.category === category);
+    const matchesScope = category === "recent" ? recent.has(String(tile.dataset.id)) : (category === "all" || tile.dataset.category === category);
+    const match = (!query || tile.dataset.search.includes(query) || tile.dataset.barcode === query || tile.dataset.sku.toLowerCase() === query) && matchesScope;
     tile.hidden = !match;
     if (match) visible += 1;
   });
@@ -420,6 +470,7 @@ async function completeSale(after = "done") {
   if (!isCredit && pay.paid_total < pay.total) return toast("Payment total is less than the bill total", "warning");
   POS.submitting = true;
   qsa(".complete-sale").forEach(btn => { btn.disabled = true; btn.textContent = "Completing..."; });
+  const completedItems = [...POS.cart];
   const body = {
     request_id: uid(),
     customer_id: qs("#posCustomer").value,
@@ -436,6 +487,7 @@ async function completeSale(after = "done") {
   qsa(".complete-sale").forEach(btn => { btn.disabled = false; btn.textContent = btn.dataset.after === "done" ? "Complete Sale" : `Complete + ${btn.dataset.after[0].toUpperCase()}${btn.dataset.after.slice(1)}`; });
   if (!res.ok) return toast(data.error || "Sale failed", "danger");
   POS.lastReceiptUrl = `/pos/receipt/${data.sale_id}`;
+  rememberRecentProducts(completedItems);
   POS.cart = [];
   qs("#billDiscount").value = "0";
   qs("#couponCode").value = "";
@@ -509,6 +561,7 @@ async function deleteHeld(id) {
 }
 
 function bindStaticEvents() {
+  markRecentProductTiles();
   qsa(".pos-product").forEach(tile => {
     tile.addEventListener("click", event => {
       const product = productFromTile(tile);
@@ -584,6 +637,19 @@ function bindStaticEvents() {
   });
   qs("#addPaymentRow").addEventListener("click", () => { POS.paymentRows.push({mode:"Cash", amount:0, reference:""}); POS.paymentMode = "Split"; renderPaymentRows(); });
   qsa(".complete-sale").forEach(btn => btn.addEventListener("click", () => completeSale(btn.dataset.after)));
+  qsa("[data-numpad]").forEach(btn => btn.addEventListener("click", () => {
+    const input = qs("#numpadValue");
+    if (btn.dataset.numpad === "⌫") input.value = input.value.slice(0, -1);
+    else if (btn.dataset.numpad !== "." || !input.value.includes(".")) input.value += btn.dataset.numpad;
+  }));
+  qs("[data-numpad-clear]")?.addEventListener("click", () => { qs("#numpadValue").value = ""; });
+  qs("[data-numpad-apply]")?.addEventListener("click", () => {
+    if (POS.activeQtyIndex === null || !POS.cart[POS.activeQtyIndex]) return;
+    const item = POS.cart[POS.activeQtyIndex];
+    item.qty = item.decimal_allowed ? Math.max(0.001, money(qs("#numpadValue").value)) : Math.max(1, Math.round(money(qs("#numpadValue").value)));
+    bootstrap.Modal.getInstance(qs("#qtyNumpadModal"))?.hide();
+    renderCart();
+  });
   document.addEventListener("keydown", event => {
     if (event.key === "F2") { event.preventDefault(); qs("#posSearch").focus(); }
     if (event.key === "F3") { event.preventDefault(); qs("#posCustomer").focus(); }

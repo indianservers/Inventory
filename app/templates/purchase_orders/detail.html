@@ -2,8 +2,8 @@
 {% block content %}
 <div class="row g-3">
   <div class="col-lg-8"><div class="panel">
-    <h2 class="h5">{{ po.po_no }}</h2>
-    <p class="text-muted">{{ po.po_date }} | {{ po.supplier.name }} | {{ po.status }}</p>
+    <h2 class="h5"><span data-copy-ref="{{ po.po_no }}">{{ po.po_no }}</span></h2>
+    <p class="text-muted">{{ po.po_date }} | <a href="{{ url_for('parties.supplier_ledger', id=po.supplier.id) }}" data-party-hover data-party-type="supplier" data-party-id="{{ po.supplier.id }}">{{ po.supplier.name }}</a> | {{ po.status }}</p>
     <table class="table align-middle"><thead><tr><th>Product</th><th>Ordered</th><th>Received</th><th>Rate</th><th>Total</th></tr></thead><tbody>{% for item in po.items %}<tr><td>{{ item.product.name }}</td><td>{{ item.quantity }}</td><td>{{ item.received_qty }}</td><td>{{ item.rate }}</td><td>{{ item.line_total }}</td></tr>{% endfor %}</tbody></table>
     <div class="text-end"><strong>Total: {{ po.grand_total }}</strong></div>
   </div></div>

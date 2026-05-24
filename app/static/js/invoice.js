@@ -14,6 +14,7 @@ function legacyRowTemplate(products) {
     <select name="product_id[]" class="form-select product-select" required><option value="">Product</option>${optionsHtml(products)}</select>
     <input name="quantity[]" class="form-control qty" type="number" min="0.001" step="0.001" value="1">
     <input name="rate[]" class="form-control rate" type="number" min="0" step="0.01" value="0">
+    <input class="form-control line-amount" readonly value="0.00" aria-label="Amount before discount and tax">
     <input name="discount[]" class="form-control discount" type="number" min="0" step="0.01" value="0">
     <input name="tax_rate[]" class="form-control tax" type="number" min="0" step="0.01" value="0">
     <input class="form-control line-total" readonly value="0.00">
@@ -31,10 +32,11 @@ function cartRowTemplate(product) {
       <strong class="cart-row-title">${product ? product.name : "Select product"}</strong>
       <span class="stock-hint">${product ? `Available: ${product.current_stock}` : ""}</span>
     </div>
-    <label>Qty<input name="quantity[]" class="form-control qty" type="number" min="0.001" step="0.001" value="1"></label>
-    <label>Rate<input name="rate[]" class="form-control rate" type="number" min="0" step="0.01" value="${product ? product.sales_price : 0}"></label>
-    <label>Disc %<input name="discount[]" class="form-control discount" type="number" min="0" step="0.01" value="0"></label>
-    <label>Tax %<input name="tax_rate[]" class="form-control tax" type="number" min="0" step="0.01" value="${product ? product.tax_rate : 0}"></label>
+    <label>Qty<input name="quantity[]" class="form-control qty line-tab" type="number" min="0.001" step="0.001" value="1"></label>
+    <label>Rate<input name="rate[]" class="form-control rate line-tab" type="number" min="0" step="0.01" value="${product ? product.sales_price : 0}"></label>
+    <label>Amount<input class="form-control line-amount" readonly value="0.00"></label>
+    <label>Disc %<input name="discount[]" class="form-control discount line-tab" type="number" min="0" step="0.01" value="0"></label>
+    <label>Tax %<input name="tax_rate[]" class="form-control tax line-tab" type="number" min="0" step="0.01" value="${product ? product.tax_rate : 0}"></label>
     <label>Total<input class="form-control line-total" readonly value="0.00"></label>
     <button class="btn btn-outline-danger remove-row" type="button" title="Remove"><i class="bi bi-trash"></i></button>
   </div>`;
@@ -245,29 +247,46 @@ function updateCartState() {
   const emptyState = document.querySelector("#cart-empty-state");
   const holder = document.querySelector("#items");
   if (emptyState && holder) emptyState.hidden = holder.children.length > 0;
+  updateLineItemTabOrder();
+}
+
+function updateLineItemTabOrder() {
+  const holder = document.querySelector("#items");
+  if (!holder) return;
+  let index = 10;
+  holder.querySelectorAll(".cart-row").forEach((row) => {
+    const fields = [row.querySelector(".qty"), row.querySelector(".rate"), row.querySelector(".discount"), row.querySelector(".tax")];
+    fields.forEach((field) => { if (field) field.tabIndex = index++; });
+    const nextSelect = row.nextElementSibling?.querySelector(".product-select");
+    if (nextSelect) nextSelect.tabIndex = index++;
+  });
 }
 
 function calculateInvoice() {
   let subtotal = 0, discountTotal = 0, taxTotal = 0;
   document.querySelectorAll(".item-row").forEach((row) => {
-    const q = Number(row.querySelector(".qty").value || 0);
-    const r = Number(row.querySelector(".rate").value || 0);
-    const d = Number(row.querySelector(".discount").value || 0);
-    const t = Number(row.querySelector(".tax").value || 0);
+    const parseNumber = window.parseFormattedNumber || ((value) => Number(value || 0));
+    const q = parseNumber(row.querySelector(".qty").value);
+    const r = parseNumber(row.querySelector(".rate").value);
+    const d = parseNumber(row.querySelector(".discount").value);
+    const t = parseNumber(row.querySelector(".tax").value);
     const stock = Number(row.querySelector(".product-select").selectedOptions[0]?.dataset.stock || 0);
     const gross = q * r;
     const discount = gross * d / 100;
     const tax = (gross - discount) * t / 100;
     const total = gross - discount + tax;
     subtotal += gross; discountTotal += discount; taxTotal += tax;
+    const amount = row.querySelector(".line-amount");
+    if (amount) amount.value = gross.toFixed(2);
     row.querySelector(".line-total").value = total.toFixed(2);
     row.classList.toggle("table-warning", stock > 0 && q > stock);
     row.querySelector(".stock-hint").classList.toggle("text-danger", stock > 0 && q > stock);
   });
-  const shipping = Number(document.querySelector("#shipping_charges")?.value || 0);
-  const other = Number(document.querySelector("#other_charges")?.value || 0);
-  const roundOff = Number(document.querySelector("#round_off")?.value || 0);
-  const paid = Number(document.querySelector("#paid_amount")?.value || 0);
+  const parseNumber = window.parseFormattedNumber || ((value) => Number(value || 0));
+  const shipping = parseNumber(document.querySelector("#shipping_charges")?.value);
+  const other = parseNumber(document.querySelector("#other_charges")?.value);
+  const roundOff = parseNumber(document.querySelector("#round_off")?.value);
+  const paid = parseNumber(document.querySelector("#paid_amount")?.value);
   const grand = subtotal - discountTotal + taxTotal + shipping + other + roundOff;
   setValue("#subtotal", subtotal.toFixed(2));
   setValue("#discount_total", discountTotal.toFixed(2));

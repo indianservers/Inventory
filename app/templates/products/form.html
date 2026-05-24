@@ -8,7 +8,7 @@
       ('purchase_price','Purchase Price','number',0),('sales_price','Sales Price','number',0),('mrp','MRP','number',0),('opening_stock','Opening Stock','number',0),
       ('min_stock','Minimum Stock','number',0),('max_stock','Maximum Stock','number',0),('reorder_level','Reorder Level','number',0),('rack_bin','Rack/Bin','text',0)
     ] %}
-    <div><label class="form-label">{{ label }}</label><input class="form-control" name="{{ name }}" type="{{ typ }}" step="0.001" value="{{ product|attr(name) or '' }}" {% if req %}required{% endif %}></div>
+    <div><label class="form-label">{{ label }}</label><input class="form-control" name="{{ name }}" type="{{ typ }}" step="0.001" value="{{ product|attr(name) or '' }}" {% if name == 'name' %}autofocus{% endif %} {% if req %}required{% endif %}></div>
     {% endfor %}
     <div><label class="form-label">Category</label><select class="form-select" name="category_id"><option value="">None</option>{% for x in categories %}<option value="{{ x.id }}" {% if product.category_id==x.id %}selected{% endif %}>{{ x.name }}</option>{% endfor %}</select></div>
     <div><label class="form-label">Brand</label><select class="form-select" name="brand_id"><option value="">None</option>{% for x in brands %}<option value="{{ x.id }}" {% if product.brand_id==x.id %}selected{% endif %}>{{ x.name }}</option>{% endfor %}</select></div>

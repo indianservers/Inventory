@@ -20,6 +20,7 @@ class Customer(db.Model):
     gst_number = db.Column(db.String(20))
     pan_number = db.Column(db.String(20))
     customer_type = db.Column(db.String(20), default='Retail')
+    tags = db.Column(db.String(255), default='')
     credit_limit = db.Column(db.Numeric(12, 2), default=0)
     opening_balance = db.Column(db.Numeric(12, 2), default=0)
     current_balance = db.Column(db.Numeric(12, 2), default=0)
@@ -42,6 +43,10 @@ class Customer(db.Model):
             func.sum(CustomerLedger.debit) - func.sum(CustomerLedger.credit)
         ).filter_by(customer_id=self.id).scalar()
         return float(result or 0)
+
+    @property
+    def tag_list(self):
+        return [tag.strip() for tag in (self.tags or '').split(',') if tag.strip()]
 
     def __repr__(self):
         return f'<Customer {self.name}>'
@@ -66,6 +71,7 @@ class Supplier(db.Model):
     gst_number = db.Column(db.String(20))
     pan_number = db.Column(db.String(20))
     tax_treatment = db.Column(db.String(30), default='Registered')
+    tags = db.Column(db.String(255), default='')
     opening_balance = db.Column(db.Numeric(12, 2), default=0)
     current_balance = db.Column(db.Numeric(12, 2), default=0)
     payment_terms = db.Column(db.Integer, default=30)
@@ -88,6 +94,10 @@ class Supplier(db.Model):
             func.sum(SupplierLedger.credit) - func.sum(SupplierLedger.debit)
         ).filter_by(supplier_id=self.id).scalar()
         return float(result or 0)
+
+    @property
+    def tag_list(self):
+        return [tag.strip() for tag in (self.tags or '').split(',') if tag.strip()]
 
     def __repr__(self):
         return f'<Supplier {self.name}>'

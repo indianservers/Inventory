@@ -46,7 +46,16 @@ def parse_return_items():
 @bp.route("/")
 @login_required
 def index():
-    return render_template("purchases/index.html", title="Purchase Invoices", purchases=Purchase.query.order_by(Purchase.id.desc()).all())
+    query = Purchase.query
+    if request.args.get("status"):
+        query = query.filter(Purchase.status == request.args["status"])
+    if request.args.get("supplier_id"):
+        query = query.filter(Purchase.supplier_id == request.args["supplier_id"])
+    if request.args.get("date_from"):
+        query = query.filter(Purchase.purchase_date >= date.fromisoformat(request.args["date_from"]))
+    if request.args.get("date_to"):
+        query = query.filter(Purchase.purchase_date <= date.fromisoformat(request.args["date_to"]))
+    return render_template("purchases/index.html", title="Purchase Invoices", purchases=query.order_by(Purchase.id.desc()).all(), suppliers=Supplier.query.order_by(Supplier.name).all(), statuses=["Draft", "Approved", "Cancelled"])
 
 
 @bp.route("/create", methods=["GET", "POST"])

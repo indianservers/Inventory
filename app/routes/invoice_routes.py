@@ -48,7 +48,7 @@ def index():
         query = query.filter(Sale.invoice_date >= date.fromisoformat(request.args["date_from"]))
     if request.args.get("date_to"):
         query = query.filter(Sale.invoice_date <= date.fromisoformat(request.args["date_to"]))
-    return render_template("invoices/index.html", title="Invoices", invoices=query.order_by(Sale.id.desc()).all(), customers=Customer.query.order_by(Customer.name).all(), statuses=["Draft", "Issued", "Partially Paid", "Paid", "Overdue", "Cancelled"])
+    return render_template("invoices/index.html", title="Invoices", invoices=query.order_by(Sale.id.desc()).all(), customers=Customer.query.order_by(Customer.name).all(), statuses=["Draft", "Issued", "Partially Paid", "Paid", "Overdue", "Cancelled"], today=date.today())
 
 
 @bp.route("/create", methods=["GET", "POST"])

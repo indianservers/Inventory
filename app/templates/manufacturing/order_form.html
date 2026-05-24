@@ -2,6 +2,11 @@
 {% block content %}
 <form class="panel" method="post">
   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <div class="flow-stepbar" aria-label="Manufacturing flow progress">
+    <span>Step 1: BOM</span>
+    <span class="active">Step 2: Manufacturing Order</span>
+    <span>Step 3: Stock Update</span>
+  </div>
   <div class="form-grid">
     <div><label class="form-label">MO No</label><input class="form-control" name="mo_no" value="{{ order.mo_no }}"></div>
     <div><label class="form-label">BOM</label><select class="form-select" name="bom_id" required><option value="">Select</option>{% for bom in boms %}<option value="{{ bom.id }}">{{ bom.name }} - {{ bom.product.name }}</option>{% endfor %}</select></div>
